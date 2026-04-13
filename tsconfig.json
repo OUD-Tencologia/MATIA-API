@@ -1,27 +1,34 @@
 {
   "compilerOptions": {
-    /* Layout de Arquivos */
-    "rootDir": "./src" /* Onde o TSC começa a procurar seus arquivos .ts (pasta raiz) */,
-    "outDir": "./dist" /* Onde o TSC salvará os arquivos .js compilados */,
-
-    /* Configurações de Módulos (Essenciais para Node.js ESM) */
+    "rootDir": "./src",
+    "outDir": "./dist",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "target": "ES2022" /* Versão JS de saída (compatível com Node.js moderno) */,
+    "target": "ES2022",
     "lib": ["ES2022"],
-    "types": ["node"] /* Tipagens para o ambiente Node.js */,
+    "types": ["node"],
 
-    /* Strictness e Interoperabilidade */
-    "strict": true /* Ativa todas as verificações rigorosas de tipo */,
-    "esModuleInterop": true /* Melhora a interoperabilidade entre CommonJS e ESM */,
-    "skipLibCheck": true /* Ignora a verificação de tipo em arquivos de terceiros (mais rápido) */,
-    "forceConsistentCasingInFileNames": true /* Garante que os nomes de arquivos são consistentes */,
+    /* ADICIONAR ESTAS LINHAS: */
+    "resolveJsonModule": true,           // Para importar package.json ou configs
+    "baseUrl": ".",                      // Para paths absolutos
+    "paths": {
+      "@/*": ["src/*"]                   // Import absoluto: @/services/auth
+    },
+    "verbatimModuleSyntax": false,        // Garante que 'import type' seja usado explicitamente
 
-    /* Opções Adicionais (opcional, mas bom) */
-    "isolatedModules": true /* Ajuda ferramentas como Babel/ts-node */,
-    "sourceMap": true /* Gera mapas para facilitar o debug */,
-    "declaration": true /* Gera arquivos .d.ts para tipagem */
+    /* MANTER/VERIFICAR: */
+    "strict": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true, // Já ativo via esModuleInterop, mas explícito ajuda
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "sourceMap": true,
+    "declaration": true,
+
+    /* IMPORTANTE para Fastify + ESM: */
+    "declarationMap": true               // Mapas para debug de tipos
   },
-  "include": ["src/**/*.ts"] /* Quais arquivos incluir na compilação */,
-  "exclude": ["node_modules", "dist", "tests", "scripts", "migrations"] /* Quais pastas ignorar */
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests", "scripts", "migrations"]
 }

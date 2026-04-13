@@ -1,4 +1,7 @@
+
+/*
 import type { FastifyInstance } from 'fastify'
+
 import * as userRoleController from '../controllers/user_roleController.js'
 import { adminOnly } from '../middleware/authorize.js'
 
@@ -89,3 +92,4 @@ const userRoleRoutes = async (fastify: FastifyInstance) => {
 }
 
 export default userRoleRoutes
+*/

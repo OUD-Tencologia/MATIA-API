@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs';
 import profile from '../models/profile.js'
 
 export const verifyCredentials = async (password: string, email: string) => {

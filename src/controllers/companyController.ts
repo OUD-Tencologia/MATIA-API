@@ -1,118 +1,71 @@
-import type { FastifyRequest } from 'fastify'
-import type { CompanyAttributes } from '../models/company.js'
-import Company from '../models/company.js'
-import {
-  MissingFieldError,
-  ValidationError,
-  InternalServerError,
-  DocumentNotFoundError,
-  DataBaseError,
-} from '../errors/errors.js'
-import { ErrorCodes } from '../errors/errorCodes.js'
-import { successResponse } from '../utils/response.js'
+import type { FastifyRequest, FastifyReply } from 'fastify';
+import { CompanyService } from '../services/CompanyService.js';
+import type { CreateCompanyDTO } from '../dtos/CompanyDTO.js';
+import type { CreateUserDTO } from '../dtos/UserDTO.js';
 
-interface CreateBody extends Omit<CompanyAttributes, 'id' | 'created_at'> {}
+export class CompanyController {
 
-interface UpdateBody extends Partial<CreateBody> {}
+  /**
+   * 🚀 REGISTRO COMPLETO (Empresa + Admin)
+   * Este é o endpoint que o seu formulário de "Cadastro de Sistema" vai chamar.
+   */
+  static async registrar(request: FastifyRequest, reply: FastifyReply) {
+    // Esperamos um corpo que contenha os dados da empresa e do admin separadamente
+    const { company, admin } = request.body as {
+      company: CreateCompanyDTO,
+      admin: CreateUserDTO
+    };
 
-interface Params {
-  id: string
-}
+    // Chamamos o Service que já cuida da Transação (Atomicidade)
+    const result = await CompanyService.registrarNovaEmpresa(company, admin);
 
-export const createCompany = async (request: FastifyRequest) => {
-  try {
-    const payload = request.body as CreateBody
-    if (!payload || Object.keys(payload).length === 0) {
-      throw new MissingFieldError()
-    }
-    if (
-      payload.plano !== 'trial' &&
-      payload.plano !== 'basico' &&
-      payload.plano !== 'enterprise' &&
-      payload.plano !== 'profissional'
-    ) {
-      throw new ValidationError('Dados inválidos', {
-        code: ErrorCodes.VALIDATION_ERROR,
-      })
-    }
-    const created = await Company.create(payload as any)
-    const data = created.toJSON()
-    return successResponse(data, 'Sucesso ao criar a empresa')
-  } catch (err: any) {
-    if (err && err.name === 'SequelizeValidationError') {
-      throw new ValidationError('Dados inválidos', {
-        code: ErrorCodes.VALIDATION_ERROR,
-      })
-    }
-    throw new InternalServerError('Erro ao criar a empresa', {
-      code: ErrorCodes.CREATE_FAILED,
-    })
+    return reply.status(201).send({
+      success: true,
+      message: 'Empresa e Administrador registrados com sucesso!',
+      data: result
+    });
   }
-}
 
-export const getCompanybyID = async (request: FastifyRequest) => {
-  try {
-    const { id } = request.params as Params
-    const item = await Company.findByPk(id)
-    const data = item?.toJSON()
-    if (!item) throw new DocumentNotFoundError()
-    return successResponse(data, 'Sucesso ao encontrar a empresa')
-  } catch (err: any) {
-    throw new DocumentNotFoundError()
+  /**
+   * 🔍 LISTAR TODAS
+   */
+  static async listar(request: FastifyRequest, reply: FastifyReply) {
+    const empresas = await CompanyService.listarTodas();
+    return reply.send({ success: true, data: empresas });
   }
-}
 
-export const getCompany = async () => {
-  try {
-    const item = await Company.findAll()
-    if (item.length === 0) {
-      return successResponse([], 'nenhum ActivityLogs encontrado')
-    }
-    return successResponse(item, 'listando todos ActivityLogs')
-  } catch (err: any) {
-    throw new DataBaseError()
+  /**
+   * 🔍 BUSCAR POR ID
+   */
+  static async buscar(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params as { id: string };
+    const empresa = await CompanyService.buscarPorId(id);
+    return reply.send({ success: true, data: empresa });
   }
-}
 
-export const updateCompany = async (request: FastifyRequest) => {
-  try {
-    const { id } = request.params as Params
-    const [updatedRows] = await Company.update(request.body as UpdateBody, {
-      where: { id },
-    })
-    if (updatedRows === 0) throw new DocumentNotFoundError()
-    const updated = await Company.findByPk(id)
-    const data = updated?.toJSON()
-    return successResponse(data, 'Sucesso ao atualizar a empresa')
-  } catch (err: any) {
-    if (err && err.name === 'SequelizeValidationError') {
-      throw new ValidationError('Dados inválidos', {
-        code: ErrorCodes.VALIDATION_ERROR,
-      })
-    }
-    throw new InternalServerError('Erro ao atualizar a empresa', {
-      code: ErrorCodes.UPDATE_FAILED,
-    })
+  /**
+   * 📝 ATUALIZAR
+   */
+  static async atualizar(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params as { id: string };
+    const data = request.body as any;
+
+    const atualizada = await CompanyService.atualizar(id, data);
+    return reply.send({
+      success: true,
+      message: 'Dados da empresa atualizados.',
+      data: atualizada
+    });
   }
-}
 
-export const deleteCompany = async (request: FastifyRequest) => {
-  try {
-    const { id } = request.params as Params
-    const deleted = await Company.destroy({ where: { id } })
-    if (deleted === 0) throw new DocumentNotFoundError()
-    return successResponse('Sucesso ao deletar a empresa')
-  } catch (err: any) {
-    throw new InternalServerError('Erro ao deletar a empresa', {
-      code: ErrorCodes.DELETE_FAILED,
-    })
+  /**
+   * 🗑️ EXCLUIR (Com Cascade)
+   */
+  static async excluir(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = request.params as { id: string };
+
+    await CompanyService.excluir(id);
+
+    return reply.status(204).send(); // 204 No Content (Sucesso sem corpo)
   }
-}
-
-export default {
-  createCompany,
-  getCompany,
-  getCompanybyID,
-  updateCompany,
-  deleteCompany,
 }

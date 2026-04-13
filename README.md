@@ -238,7 +238,7 @@ matia-server-fastify-teste/
 │   │   └── config.json                  # Configuração do Sequelize por ambiente
 │   ├── controllers/                     # Lógica de negócio de cada recurso
 │   │   ├── loginController.ts           # Autenticação e geração de JWT
-│   │   ├── profileController.ts         # CRUD de usuários (valida CPF, hash bcrypt)
+│   │   ├── ProfileController.ts         # CRUD de usuários (valida CPF, hash bcrypt)
 │   │   ├── chatController.ts            # Integração com LLM (OpenAI)
 │   │   ├── messagesController.ts
 │   │   ├── documentsController.ts

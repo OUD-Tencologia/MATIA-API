@@ -169,7 +169,7 @@ matia-server-fastify-teste/
 │   └── config.json
 ├── controllers/            # Lógica de negócio
 │   ├── loginController.ts
-│   ├── profileController.ts
+│   ├── ProfileController.ts
 │   ├── messagesController.ts
 │   ├── documentsController.ts
 │   ├── documents_tagsController.ts

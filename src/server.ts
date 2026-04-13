@@ -1,3 +1,4 @@
+import './init.js';
 import cors from '@fastify/cors'
 import swagger from '@fastify/swagger'
 import fastifyEnv from '@fastify/env'
@@ -10,6 +11,7 @@ import Fastify from 'fastify'
 // Carrega variáveis de ambiente ANTES de importar db.js
 import { config } from 'dotenv'
 config()
+process.env.TZ = 'America/Cuiaba'
 
 // Importação da instância do Sequelize (já tipada)
 import sequelize from './db.js'
@@ -27,13 +29,13 @@ import companyRoutes from './routes/companyRoutes.js'
 // Importações dos Módulos de Rotas (agora são arquivos .ts ou .js compilados)
 import profileRoutes from './routes/profileRoutes.js'
 import userActivityLogsRoutes from './routes/user_activity_logRoutes.js'
-import userRoleRoutes from './routes/user_roleRoutes.js'
 import {
   errorHandler,
   setupGlobalErrorHandlers,
 } from './middleware/errorHandler.js'
 import { helmetPlugin } from './plugins/helmet.js'
 import { cachePlugin } from './plugins/cachePlugin.js'
+import {setupAssociations} from "./models/setupAssociations.js";
 
 // Tipando a instância do Fastify explicitamente
 const fastify: FastifyInstance = Fastify({
@@ -79,6 +81,7 @@ await fastify.register(authenticate)
 
 await fastify.register(cors, {
   origin: [
+    'http://localhost:4200',
     'http://localhost:3000',
     'http://localhost:5173',
     'https://matia-legal-ai.vercel.app',
@@ -154,49 +157,56 @@ await fastify.register(swagger, {
     security: [{ bearerAuth: [] }],
   },
 })
-
 // --- REGISTRO DE ROTAS ---
-await fastify.register(chatRoutes, {
-  prefix: '/api',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(companyRoutes, {
-  prefix: '/api/companies',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(profileRoutes, {
-  prefix: '/api/profile',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(userRoleRoutes, {
-  prefix: '/api/user_roles',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(messagesRoutes, {
-  prefix: '/api/messages',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(documentsRoutes, {
-  prefix: '/api/documents',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(documentsTagsRoutes, {
-  prefix: '/api/documents_tags',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(documentsTagsRelationsRoutes, {
-  prefix: '/api/documents_tags_relations',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(documentsAnalysesRoutes, {
-  prefix: '/api/documents_analyses',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(conversationsRoutes, {
-  prefix: '/api/conversations',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(conversationDocumentsRoutes, {
-  prefix: '/api/conversation_documents',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(activityLogsRoutes, {
-  prefix: '/api/activity_logs',
-} as FastifyRegisterOptions<FastifyInstance>)
-await fastify.register(userActivityLogsRoutes, {
-  prefix: '/api/user_activity_log',
-} as FastifyRegisterOptions<FastifyInstance>)
+
 await fastify.register(loginRoutes, {
   prefix: '/api/auth',
+})
+
+// 2. Empresas (Onde o admin e a empresa nascem juntos)
+await fastify.register(companyRoutes, {
+  prefix: '/api/companies',
+})
+
+// 3. Perfis/Usuários (Gerenciamento de usuários dentro das empresas)
+await fastify.register(profileRoutes, {
+  prefix: '/api/profile',
+})
+
+// 4. Chat e Inteligência Artificial
+await fastify.register(chatRoutes, {
+  prefix: '/api',
+})
+await fastify.register(messagesRoutes, {
+  prefix: '/api/messages',
+})
+await fastify.register(conversationsRoutes, {
+  prefix: '/api/conversations',
+})
+await fastify.register(conversationDocumentsRoutes, {
+  prefix: '/api/conversation_documents',
+})
+
+// 5. Gestão de Documentos e Análises
+await fastify.register(documentsRoutes, {
+  prefix: '/api/documents',
+})
+await fastify.register(documentsTagsRoutes, {
+  prefix: '/api/documents_tags',
+})
+await fastify.register(documentsTagsRelationsRoutes, {
+  prefix: '/api/documents_tags_relations',
+})
+await fastify.register(documentsAnalysesRoutes, {
+  prefix: '/api/documents_analyses',
+})
+
+// 6. Logs de Auditoria
+await fastify.register(activityLogsRoutes, {
+  prefix: '/api/activity_logs',
+})
+await fastify.register(userActivityLogsRoutes, {
+  prefix: '/api/user_activity_log',
 })
 
 // --- SWAGGER/OPENAPI CONFIGURAÇÃO ---
@@ -211,6 +221,11 @@ const start = async () => {
     await sequelize.authenticate()
     fastify.log.info('Conexão com o banco estabelecida com sucesso')
 
+    // 1. Monta as setas e relações entre as tabelas na memória
+    setupAssociations()
+    // 2. 🛠️ ADICIONE ESTA LINHA AQUI: Sincroniza os models com o banco de dados
+    await sequelize.sync({ alter: true })
+    fastify.log.info('Tabelas sincronizadas com sucesso no banco de dados!')
     await fastify.ready()
 
     await fastify.listen({ port: 3002, host: '0.0.0.0' })

@@ -1,7 +1,8 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify'
 import { AppError } from '../errors/appError.js'
 import { ZodError } from 'zod'
-import { InternalServerError, ValidationError } from '../errors/errors.js'
+import {InternalServerError, ValidationError, UnauthorizedError, TooManyRequestsError} from '../errors/errors.js'
+
 
 interface ErrorResponse {
   success: false
@@ -63,11 +64,8 @@ function handleZodError(error: ZodError): AppError {
 }
 
 function handleFastifyError(error: FastifyError): AppError {
-  const {
-    ValidationError,
-    UnauthorizedError,
-    TooManyRequestsError,
-  } = require('../errors/errors.js')
+  // O const {...} = require(...) foi deletado!
+  // O Node agora pega as classes direto do import lá no topo.
 
   if (error.validation) {
     return new ValidationError('Erro de validação', {
@@ -85,7 +83,6 @@ function handleFastifyError(error: FastifyError): AppError {
 
   return new InternalServerError(error.message)
 }
-
 function normalizeError(error: Error | AppError | FastifyError): AppError {
   if (error instanceof AppError) {
     return error

@@ -219,6 +219,13 @@ export class ExternalServiceError extends InternalServerError {
   }
 }
 
+export class TooManyRequestsError extends AppError {
+  constructor(message: string = 'Muitas requisições. Tente novamente mais tarde.') {
+    // 👇 Ordem correta: (statusCode, errorCode, message)
+    super(429, 'TOO_MANY_REQUESTS' as any, message)
+  }
+}
+
 export class TimeoutError extends InternalServerError {
   constructor(operation: string, timeout: number) {
     super(`Operação "${operation}" excedeu o tempo limite de ${timeout}ms`, {
@@ -227,4 +234,6 @@ export class TimeoutError extends InternalServerError {
       timeout,
     })
   }
+
+
 }
