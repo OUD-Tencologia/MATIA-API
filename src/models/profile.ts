@@ -29,6 +29,7 @@ export interface ProfileAttributes {
     refresh_token?: string | null
     password_reset_token?: string | null;
     password_reset_expires?: Date | null;
+    primeiro_acesso: boolean;
 }
 
 export interface ProfileCreationAttributes
@@ -49,6 +50,7 @@ export interface ProfileCreationAttributes
         | 'refresh_token'
         | 'password_reset_token'
         | 'password_reset_expires'
+        | 'primeiro_acesso'
     > {}
 
 class Profile
@@ -79,6 +81,7 @@ class Profile
     declare public refresh_token: string | null
     declare public password_reset_token: string | null
     declare public password_reset_expires: Date | null
+    declare public primeiro_acesso: boolean;
 }
 
 Profile.init(
@@ -182,6 +185,11 @@ Profile.init(
         password_reset_expires: {
             type: DataTypes.DATE,
             allowNull: true,
+        },
+        primeiro_acesso: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
         }
     },
     {

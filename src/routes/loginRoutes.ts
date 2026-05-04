@@ -220,6 +220,25 @@ const loginRoutes = async (fastify: FastifyInstance) => {
         },
         AuthController.changePassword
     );
+    fastify.post(
+        '/first-access',
+        {
+            schema: {
+                tags: ['Auth'],
+                summary: 'Altera a senha temporária obrigatória no primeiro acesso do usuário',
+                body: {
+                    type: 'object',
+                    required: ['currentPassword', 'newPassword'],
+                    properties: {
+                        currentPassword: { type: 'string' },
+                        newPassword: { type: 'string', minLength: 6 }
+                    }
+                }
+            },
+            onRequest: [fastify.authenticate] // Garante que o usuário tem um token válido
+        },
+        AuthController.changeFirstAccessPassword
+    );
     // 7. LOGOUT
     fastify.post(
         '/logout',

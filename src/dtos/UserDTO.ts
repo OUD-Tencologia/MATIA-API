@@ -16,6 +16,7 @@ export interface CreateUserDTO {
     status?: 'ativo' | 'inativo';
     permissoes?: PermissaoDTO[] | null;
     avatar_url?: string | null;
+    primeiro_acesso?: boolean;
 }
 
 export interface UpdateUserDTO extends Partial<Omit<CreateUserDTO, 'empresa_id' | 'cpf'>> {
@@ -27,4 +28,5 @@ export interface UserResponseDTO extends Omit<CreateUserDTO, 'profile_password'>
     creation_time: Date;
     updated_at: Date | null;
     ultimo_acesso: Date | null;
+    primeiro_acesso: boolean;
 }

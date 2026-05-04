@@ -13,6 +13,7 @@ export interface LoginResponseDTO {
         role: 'SUPER-ADMIN' | 'ADMIN' | 'USER';
         empresa_id: string | null;
         avatar_url: string | null;
+        primeiro_acesso: boolean;
     };
 }
 

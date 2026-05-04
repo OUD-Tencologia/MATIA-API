@@ -196,4 +196,37 @@ export class AuthController {
             });
         }
     }
+
+    //Endpoint para Alteração de Senha no Primeiro Acesso
+    static async changeFirstAccessPassword(request: FastifyRequest, reply: FastifyReply) {
+        try {
+            // O Angular envia a senha temporária e a nova senha no corpo da requisição
+            const { currentPassword, newPassword } = request.body as any;
+
+            // Pega o ID do usuário através do token JWT que o Angular mandou no Header
+            const userId = (request.user as any).id;
+
+            if (!currentPassword || !newPassword) {
+                return reply.status(400).send({
+                    success: false,
+                    message: 'Senha atual e nova senha são obrigatórias.'
+                });
+            }
+
+            // Chama o nosso novo método no Service
+            const result = await AuthService.changeFirstAccessPassword(userId, currentPassword, newPassword);
+
+            return reply.status(200).send({
+                success: true,
+                message: result.message
+            });
+
+        } catch (error: any) {
+            // Repassa o erro de senha incorreta ou outro problema para o Angular
+            return reply.status(400).send({
+                success: false,
+                message: error.message
+            });
+        }
+    }
 }

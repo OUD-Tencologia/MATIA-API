@@ -24,7 +24,8 @@ export class ProfileService {
             data_nascimento: data.data_nascimento ? new Date(data.data_nascimento) : new Date(),
             creation_time: data.creation_time || data.createdAt || new Date(),
             updated_at: data.updated_at || data.updatedAt || null,
-            ultimo_acesso: data.ultimo_acesso ?? null
+            ultimo_acesso: data.ultimo_acesso ?? null,
+            primeiro_acesso: data.primeiro_acesso
         };
     }
 

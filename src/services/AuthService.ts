@@ -185,7 +185,8 @@ export class AuthService {
                 email: user.email,
                 role: user.role as 'SUPER-ADMIN' | 'ADMIN' | 'USER',
                 empresa_id: user.empresa_id,
-                avatar_url: user.avatar_url
+                avatar_url: user.avatar_url,
+                primeiro_acesso: user.primeiro_acesso
             }
         };
     }
@@ -293,6 +294,27 @@ export class AuthService {
         });
 
         return { message: 'Senha alterada com sucesso!' };
+    }
+
+
+    //  Troca de senha obrigatória do Primeiro Acesso
+    static async changeFirstAccessPassword(userId: string, currentPassword: string, newPassword: string) {
+        // 1. Busca o usuário pelo ID (usamos unscoped para o Sequelize trazer o hash da senha)
+        const user = await Profile.unscoped().findByPk(userId);
+        if (!user) throw new InternalServerError('Usuário não encontrado.');
+
+        // 2. Verifica se a senha temporária informada está correta
+        const isPasswordValid = await bcrypt.compare(currentPassword, user.profile_password);
+        if (!isPasswordValid) throw new UnauthorizedError('A senha atual está incorreta.');
+
+        // 3. Gera o hash da NOVA senha
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // 4. Dispara a atualização dupla lá no nosso Repository!
+        await UserRepository.updatePasswordAndFirstAccess(userId, hashedPassword);
+
+        return { message: 'Senha inicial alterada com sucesso! Acesso liberado.' };
     }
 
     static async logout(): Promise<{ message: string }> {

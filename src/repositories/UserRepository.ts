@@ -140,4 +140,15 @@ export class UserRepository {
             { where: queryWhere }
         );
     }
+
+    // AUTENTICAÇÃO E SEGURANÇA INTELIGENTE
+    static async updatePasswordAndFirstAccess(id: string, newHashedPassword: string): Promise<void> {
+        await Profile.update(
+            {
+                profile_password: newHashedPassword,
+                primeiro_acesso: false // 🔓 Libera o usuário do "modo primeiro acesso"
+            } as any,
+            { where: { id } }
+        );
+    }
 }
