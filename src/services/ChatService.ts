@@ -56,7 +56,7 @@ export class ChatService {
                 response_style: dto.response_style || "equilibrada"
             }, {
                 headers: {
-                    'X-API-Key': 'hORvJGwnDvT3GCNi6WHMEXFzE4kZOwnV',
+                    'X-API-Key': process.env['MATIA_RAG_API_KEY'],
                     'Content-Type': 'application/json'
                 },
                 // Mantendo a proteção contra o proxy da dbseller que vimos no log
