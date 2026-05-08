@@ -21,7 +21,7 @@ services:
       - "6379:6379"
 
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: edson123

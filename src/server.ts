@@ -26,6 +26,7 @@ import documentsTagsRoutes from './routes/documents_tagsRoutes.js'
 import documentsRoutes from './routes/documentsRoutes.js'
 import messagesRoutes from './routes/messagesRoutes.js'
 import chatRoutes from './routes/chatRoutes.js'
+import chatMatiaRoutes from '@/routes/chatMatiaRoutes.js';
 import companyRoutes from './routes/companyRoutes.js'
 import profileRoutes from './routes/profileRoutes.js'
 import userActivityLogsRoutes from './routes/user_activity_logRoutes.js'
@@ -54,24 +55,38 @@ await fastify.register(fastifyEnv, {
       'JWT_SECRET',
       'JWT_REFRESH_SECRET',
       'COOKIE_SECRET',
+      'FRONTEND_URL',
+      'DB_PORT',
       'DB_HOST',
       'DB_NAME',
       'DB_USER',
       'DB_PASS',
-      'MAIL_HOST',
-      'MAIL_PORT',
-      'MAIL_USER',
-      'MAIL_PASS',
-      'OPEN_API_KEY',
+      'SMTP_HOST',
+      'SMTP_PORT',
+      'SMTP_SECURE',
+      'SMTP_USER',
+      'SMTP_PASS',
+      'MAIL_FROM',
+      'GEMINI_API_KEY',
     ],
     properties: {
       JWT_SECRET: { type: 'string' },
       JWT_REFRESH_SECRET: { type: 'string' },
       COOKIE_SECRET: { type: 'string' },
-      MAIL_HOST: { type: 'string' },
-      MAIL_PORT: { type: 'string' },
-      MAIL_USER: { type: 'string' },
-      MAIL_PASS: { type: 'string' },
+      FRONTEND_URL: { type: 'string' },
+      DB_HOST: { type: 'string' },
+      DB_PORT: { type: 'number' },
+      DB_NAME: { type: 'string' },
+      DB_USER: { type: 'string' },
+      DB_PASS: { type: 'string' },
+      // Nossas novas variáveis de E-mail
+      SMTP_HOST: { type: 'string' },
+      SMTP_PORT: { type: 'number' },
+      SMTP_SECURE: { type: 'boolean' },
+      SMTP_USER: { type: 'string' },
+      SMTP_PASS: { type: 'string' },
+      MAIL_FROM: { type: 'string' },
+      GEMINI_API_KEY: { type: 'string' },
     },
   },
   dotenv: true,
@@ -120,11 +135,13 @@ await fastify.register(swagger, {
     },
     servers: [
       {
-        url: isProduction ? 'http://103.204.193.6:3002' : 'http://localhost:3002',
+        // Ajustado para a porta externa 42503 na VPS!
+        url: isProduction ? 'http://103.204.193.6:42503' : 'http://localhost:3002',
         description: isProduction ? 'Servidor de Produção (VPS)' : 'Ambiente Local',
       },
       {
-        url: isProduction ? 'http://localhost:3002' : 'http://103.204.193.6:3002',
+        //Ajustado aqui também para manter o seu padrão
+        url: isProduction ? 'http://localhost:3002' : 'http://103.204.193.6:42503',
         description: isProduction ? 'Ambiente Local' : 'Servidor de Produção (VPS)',
       }
     ],
@@ -148,6 +165,7 @@ await fastify.register(loginRoutes, { prefix: '/api/auth' })
 await fastify.register(companyRoutes, { prefix: '/api/companies' })
 await fastify.register(profileRoutes, { prefix: '/api/profile' })
 await fastify.register(chatRoutes, { prefix: '/api' })
+await fastify.register(chatMatiaRoutes, { prefix: '/api' })
 await fastify.register(messagesRoutes, { prefix: '/api/messages' })
 await fastify.register(conversationsRoutes, { prefix: '/api/conversations' })
 await fastify.register(conversationDocumentsRoutes, { prefix: '/api/conversation_documents' })

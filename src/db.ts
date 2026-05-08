@@ -28,6 +28,7 @@ if (process.env.NODE_ENV === 'test') {
   if (!process.env.DB_USER) throw new Error('DB_USER não definido no .env')
   if (!process.env.DB_PASS) throw new Error('DB_PASS não definido no .env')
   if (!process.env.DB_HOST) throw new Error('DB_HOST não definido no .env')
+  if (!process.env.DB_PORT) throw new Error('DB_PORT não definido no .env')
 
   sequelize = new Sequelize(
     process.env.DB_NAME,
@@ -35,6 +36,7 @@ if (process.env.NODE_ENV === 'test') {
     process.env.DB_PASS,
     {
       host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT),
       dialect: 'postgres',
       logging: false, // desabilita logs de SQL por padrão
     }

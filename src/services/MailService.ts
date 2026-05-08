@@ -1,26 +1,27 @@
 import nodemailer from 'nodemailer';
 
 export class MailService {
-    // Configuração do transportador usando as variáveis do .env
+    // Configuração do transportador lendo SMTP_* do seu .env
     private static transporter = nodemailer.createTransport({
-        host: process.env.MAIL_HOST,
-        port: Number(process.env.MAIL_PORT),
-        secure: false, // false para porta 587 (TLS)
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT),
+        secure: true, // true para a porta 465 que configurou
         auth: {
-            user: process.env.MAIL_USER,
-            pass: process.env.MAIL_PASS,
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
         },
     });
 
-    /**
-     * Envia o e-mail com o link de recuperação
-     */
+
+     // Envia o e-mail com o link de recuperação
     static async sendPasswordResetEmail(to: string, token: string) {
-        // Link que o usuário clicará no Angular (ajuste a URL da sua VPS depois)
-        const resetLink = `http://localhost:4200/reset-password?token=${token}`;
+        // Link que o usuário clicará no Angular
+        const baseUrl = process.env.FRONTEND_URL;
+        const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
         const mailOptions = {
-            from: `"Equipe MATIA" <${process.env.MAIL_USER}>`,
+            // Usa o MAIL_FROM que você declarou no .env
+            from: process.env.MAIL_FROM,
             to,
             subject: 'Recuperação de Senha - MATIA',
             html: `
