@@ -7,6 +7,7 @@ import {
   conversationListSchema,
   deleteConversationSchema,
 } from '../schemas/chatSchema.js'
+import {AudioController} from "@/controllers/Audiocontroller.js";
 
 const chatRoutes = async (fastify: FastifyInstance) => {
   // POST /chat/message - Envia mensagem em conversa existente
@@ -86,6 +87,48 @@ const chatRoutes = async (fastify: FastifyInstance) => {
     },
     chatController.getConversationsList
   )
+
+    fastify.post(
+        '/chat/audio',
+        {
+            schema: {
+                tags: ['Chat'],
+                summary: 'Transcreve mensagem de áudio',
+                description:
+                    'Recebe um arquivo de áudio via upload (multipart/form-data) e o ID da conversa. ' +
+                    'O sistema processa o áudio, transcreve utilizando a IA e salva o texto ' +
+                    'no histórico da conversa.',
+                consumes: ['multipart/form-data'], // Essencial para o Swagger entender que é upload de arquivo
+                // body: audioSchema.body, // (Opcional)
+                response: {
+                    200: {
+                        description: 'Áudio transcrito com sucesso',
+                        type: 'object',
+                        properties: {
+                            text: { type: 'string', description: 'Texto falado no áudio' }
+                        }
+                    },
+                    400: {
+                        description: 'Erro de validação (ex: arquivo ausente ou ID da conversa faltando)',
+                        type: 'object',
+                        properties: {
+                            error: { type: 'string' }
+                        }
+                    },
+                    500: {
+                        description: 'Erro interno no processamento da IA ou Banco de Dados',
+                        type: 'object',
+                        properties: {
+                            error: { type: 'string' }
+                        }
+                    }
+                },
+                security: [{ bearerAuth: [] }],
+            },
+            preHandler: [fastify.authenticate],
+        },
+        AudioController.transcrever
+    )
 
   // DELETE /chat/conversation/:id - Deleta conversa e mensagens
   fastify.delete(

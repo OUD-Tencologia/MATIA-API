@@ -49,7 +49,6 @@ export class ChatService {
                 company_id: companyId,
                 ia: "gemini",
                 ia_model: "gemini-2.5-flash",
-                // 🌟 SUA CHAVE: Enviando daqui, o Python não usará a dele (caso não tenha saldo)
                 client_api_key: process.env.GEMINI_API_KEY,
                 chat_history: [],
                 include_sources: true,

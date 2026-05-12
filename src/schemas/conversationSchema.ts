@@ -3,9 +3,11 @@ import type { FastifySchema } from 'fastify'
 export const createConversationsSchema: FastifySchema = {
   body: {
     type: 'object',
+    // Não colocamos o company_id no 'required' porque o perfil SUPER-ADMIN pode ter esse campo nulo
     required: ['user_id', 'title'],
     properties: {
       user_id: { type: 'string', format: 'uuid' },
+      company_id: { type: 'string', format: 'uuid' },
       title: { type: 'string' },
       is_favorite: { type: 'boolean' },
     } as const,
@@ -19,6 +21,7 @@ export const updateConversationsSchema: FastifySchema = {
     required: [],
     properties: {
       user_id: { type: 'string', format: 'uuid' },
+      company_id: { type: 'string', format: 'uuid' }, // <-- NOVO CAMPO ADICIONADO
       title: { type: 'string' },
       is_favorite: { type: 'boolean' },
     } as const,

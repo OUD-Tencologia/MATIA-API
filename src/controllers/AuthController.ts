@@ -12,7 +12,7 @@ const COOKIE_OPTIONS = {
     // MUDANÇA AQUI: 'lax' permite que o cookie seja enviado entre portas diferentes (4200 -> 3000)
     sameSite: 'lax' as const,
 
-    maxAge: 7 * 24 * 60 * 60 * 1000
+    maxAge: 7 * 24 * 60 * 60
 };
 
 export class AuthController {
