@@ -1,5 +1,6 @@
 import './init.js';
 import cors from '@fastify/cors'
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import swagger from '@fastify/swagger'
 import fastifyEnv from '@fastify/env'
 import cookie from '@fastify/cookie';
@@ -37,6 +38,7 @@ import {
 import { helmetPlugin } from './plugins/helmet.js'
 import { cachePlugin } from './plugins/cachePlugin.js'
 import { setupAssociations } from "./models/setupAssociations.js";
+import llmConfigRoutes from "@/routes/llmConfigRoutes.js";
 
 const fastify: FastifyInstance = Fastify({
   logger: {
@@ -47,6 +49,12 @@ const fastify: FastifyInstance = Fastify({
   disableRequestLogging: false,
   genReqId: () => crypto.randomUUID(),
 })
+
+declare module 'fastify' {
+  export interface FastifyInstance {
+    requireSuperAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+}
 
 await fastify.register(fastifyEnv, {
   schema: {
@@ -104,6 +112,16 @@ fastify.setErrorHandler(errorHandler)
 setupGlobalErrorHandlers(fastify.log)
 
 await fastify.register(authenticate)
+fastify.decorate('requireSuperAdmin', async function (request, reply) {
+  const user = request.user as any;
+
+  if (user.role !== 'SUPER-ADMIN') {
+    return reply.status(403).send({
+      success: false,
+      message: 'Acesso negado. Apenas o Super Administrador pode gerenciar as configurações de Inteligência Artificial.'
+    });
+  }
+});
 
 // --- CONFIGURAÇÃO DE CORS (AJUSTADA PARA VPS) ---
 await fastify.register(cors, {
@@ -140,12 +158,12 @@ await fastify.register(swagger, {
         description: isProduction ? 'Servidor de Produção (VPS)' : 'Ambiente Local',
       },
       {
-        //Ajustado aqui também para manter o seu padrão
+
         url: isProduction ? 'http://localhost:3002' : 'http://103.204.193.6:42503',
         description: isProduction ? 'Ambiente Local' : 'Servidor de Produção (VPS)',
       }
     ],
-    // --- ADICIONE ESTE BLOCO ABAIXO PARA RESOLVER O ERRO ---
+
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -166,6 +184,7 @@ await fastify.register(companyRoutes, { prefix: '/api/companies' })
 await fastify.register(profileRoutes, { prefix: '/api/profile' })
 await fastify.register(chatRoutes, { prefix: '/api' })
 await fastify.register(chatMatiaRoutes, { prefix: '/api' })
+await fastify.register(llmConfigRoutes, { prefix: '/api/llm-config' })
 await fastify.register(messagesRoutes, { prefix: '/api/messages' })
 await fastify.register(conversationsRoutes, { prefix: '/api/conversations' })
 await fastify.register(conversationDocumentsRoutes, { prefix: '/api/conversation_documents' })

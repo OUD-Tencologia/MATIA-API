@@ -1,18 +1,24 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import { ChatService } from '@/services/ChatService.js';
-import {AskQuestionDTO} from "@/dtos/ChatDTO.js";
+import type { AskQuestionDTO } from "@/dtos/ChatDTO.js";
+
+// Tipagem para o usuário que vem do seu middleware JWT
+interface JwtUser {
+    id: string;
+    role: string;
+    empresa_id: string | null;
+}
 
 export class ChatMatiaController {
 
-    static async askQuestion(request: FastifyRequest, reply: FastifyReply) {
+    // 🌟 Aplicando o Generic no Body para o TypeScript saber exatamente o formato
+    static async askQuestion(request: FastifyRequest<{ Body: AskQuestionDTO }>, reply: FastifyReply) {
         try {
-            // 1. Extrair os dados do corpo da requisição (O contrato que definimos no DTO)
-            const dto = request.body as AskQuestionDTO;
+            const dto = request.body;
 
-            // 2. Extrair o ID do usuário autenticado
-            // ⚠️ ATENÇÃO: Isso depende de como o seu middleware JWT salva os dados na requisição.
-            // Geralmente fica em request.user.id ou algo parecido.
-            const userId = (request as any).user?.id;
+            // Extrair o usuário tipando ele de forma limpa (sem o "any")
+            const user = request.user as JwtUser;
+            const userId = user?.id;
 
             // Validações básicas de entrada
             if (!userId) {
@@ -23,17 +29,14 @@ export class ChatMatiaController {
                 return reply.status(400).send({ error: 'A pergunta jurídica não pode estar vazia.' });
             }
 
-            // 3. Passar a bola para o Service fazer a mágica (e a bilhetagem do SaaS)
+            // Passar a bola para o Service (que agora lê do banco a IA correta!)
             const response = await ChatService.askMatia(dto, userId);
 
-            // 4. Devolver a resposta da IA com sucesso para o Angular
             return reply.status(200).send(response);
 
         } catch (error: any) {
             console.error('[ChatMatiaController] Erro na rota:', error.message);
 
-            // Se for um dos seus erros personalizados (que já tem statusCode), usamos ele.
-            // Se não for, devolvemos um 500 genérico.
             const statusCode = error.statusCode || 500;
             return reply.status(statusCode).send({
                 error: error.message || 'Erro interno ao processar a pergunta com a Inteligência Artificial.'

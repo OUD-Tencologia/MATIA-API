@@ -23,7 +23,10 @@ export const createProfileSchema: FastifySchema = {
         enum: ['ativo', 'inativo'],
         default: 'ativo'
       },
-      avatar_url: { type: 'string' }
+      avatar_url: { type: 'string' },
+      total_consultas: { type: 'integer', default: 0 },
+      total_tokens: { type: 'integer', default: 0 },
+      total_custo_brl: { type: 'number', default: 0.0 }
     },
     additionalProperties: false,
   },
@@ -43,7 +46,10 @@ export const updateProfileSchema: FastifySchema = {
       role: { type: 'string', enum: ['SUPER-ADMIN', 'ADMIN', 'USER'] },
       area_juridica: { type: 'string' },
       status: { type: 'string', enum: ['ativo', 'inativo'] },
-      avatar_url: { type: 'string' }
+      avatar_url: { type: 'string' },
+      total_consultas: { type: 'integer' },
+      total_tokens: { type: 'integer' },
+      total_custo_brl: { type: 'number' },
     },
     additionalProperties: false,
   },

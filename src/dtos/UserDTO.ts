@@ -17,6 +17,9 @@ export interface CreateUserDTO {
     permissoes?: PermissaoDTO[] | null;
     avatar_url?: string | null;
     primeiro_acesso?: boolean;
+    total_consultas?: number;
+    total_tokens?: number;
+    total_custo_brl?: number;
 }
 
 export interface UpdateUserDTO extends Partial<Omit<CreateUserDTO, 'empresa_id' | 'cpf'>> {
@@ -29,4 +32,8 @@ export interface UserResponseDTO extends Omit<CreateUserDTO, 'profile_password'>
     updated_at: Date | null;
     ultimo_acesso: Date | null;
     primeiro_acesso: boolean;
+    total_consultas: number;
+    total_tokens: number;
+    total_custo_brl: number;
+    two_factor_enabled: boolean;
 }

@@ -21,6 +21,10 @@ export interface ProfileAttributes {
     status: 'ativo' | 'inativo'
     ultimo_acesso: Date | null
     permissoes: any | null
+    // ✅ NOVOS CAMPOS DE ESTATÍSTICA E BILHETAGEM
+    total_consultas: number
+    total_tokens: number
+    total_custo_brl: number
 
     // ✅ NOVOS CAMPOS PARA O 2FA
     two_factor_secret?: string | null
@@ -45,6 +49,9 @@ export interface ProfileCreationAttributes
         | 'status'
         | 'ultimo_acesso'
         | 'permissoes'
+        | 'total_consultas'
+        | 'total_tokens'
+        | 'total_custo_brl'
         | 'two_factor_secret' // ✅ Opcional na criação
         | 'two_factor_enabled' // ✅ Opcional na criação
         | 'refresh_token'
@@ -74,6 +81,10 @@ class Profile
     declare public status: 'ativo' | 'inativo'
     declare public ultimo_acesso: Date | null
     declare  public permissoes: any | null
+    // ✅ Implementação das Estatísticas
+    declare public total_consultas: number
+    declare public total_tokens: number
+    declare public total_custo_brl: number
 
     // ✅ Implementação na Classe
     declare public two_factor_secret: string | null
@@ -163,6 +174,22 @@ Profile.init(
         permissoes: {
             type: DataTypes.JSONB,
             allowNull: true,
+        },
+        // ✅ MAPEAMENTO DAS ESTATÍSTICAS NO BANCO
+        total_consultas: {
+            type: DataTypes.INTEGER,
+            allowNull: false,
+            defaultValue: 0,
+        },
+        total_tokens: {
+            type: DataTypes.BIGINT, // BIGINT para suportar milhões de tokens
+            allowNull: false,
+            defaultValue: 0,
+        },
+        total_custo_brl: {
+            type: DataTypes.DECIMAL(12, 4), // Precisão para os centavos de cada consulta
+            allowNull: false,
+            defaultValue: 0.0,
         },
         // ✅ Mapeamento no Banco de Dados
         two_factor_secret: {

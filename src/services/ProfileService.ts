@@ -25,9 +25,15 @@ export class ProfileService {
             creation_time: data.creation_time || data.createdAt || new Date(),
             updated_at: data.updated_at || data.updatedAt || null,
             ultimo_acesso: data.ultimo_acesso ?? null,
-            primeiro_acesso: data.primeiro_acesso
+            primeiro_acesso: data.primeiro_acesso,
+            total_consultas: data.total_consultas || 0,
+            total_tokens: Number(data.total_tokens) || 0, // Garante que BigInt vire Number para o JSON
+            total_custo_brl: Number(data.total_custo_brl) || 0,
+            two_factor_enabled: !!data.two_factor_enabled
         };
     }
+
+
 
     /**
      * 🔍 BUSCAR POR ID (🌟 Injetado role e tipagem null)
@@ -92,15 +98,11 @@ export class ProfileService {
     /**
      * 👤 BUSCAR MEU PERFIL (🌟 Injetado role e tipagem null)
      */
-    static async obterMeuPerfil(userId: string, role: string, empresaId: string | null): Promise<UserResponseDTO & { two_factor_enabled: boolean }> {
-        const usuario = await UserRepository.findById(userId, role, empresaId);
+    static async obterMeuPerfil(userId: string): Promise<UserResponseDTO> {
+        // Usamos o findProfileData que criamos no UserRepository
+        const usuario = await UserRepository.findProfileData(userId);
         if (!usuario) throw new UserNotFoundError();
 
-        const response = this.mapToResponseDTO(usuario);
-
-        return {
-            ...response,
-            two_factor_enabled: !!(usuario as any).two_factor_enabled
-        };
+        return this.mapToResponseDTO(usuario);
     }
 }

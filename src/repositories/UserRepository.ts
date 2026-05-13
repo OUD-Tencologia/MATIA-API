@@ -151,4 +151,35 @@ export class UserRepository {
             { where: { id } }
         );
     }
+
+    static async findProfileData(id: string): Promise<Profile | null> {
+        // Retorna os dados para o componente "Meu Perfil" do Angular
+        return await Profile.findOne({
+            where: { id },
+            attributes: [
+                'id', 'nome', 'email', 'role', 'cpf', 'telefone',
+                'data_nascimento', 'area_juridica', 'status',
+                'creation_time', 'ultimo_acesso', 'two_factor_enabled',
+                'total_consultas', 'total_tokens', 'total_custo_brl' // <--- Campos vitais
+            ]
+        });
+    }
+
+    // ATUALIZAÇÃO DE ESTATÍSTICAS (Tokens e Custos)
+    static async updateStats(id: string, tokens: number, custoBrl: number): Promise<void> {
+        await Profile.increment(
+            {
+                total_tokens: tokens,
+                total_custo_brl: custoBrl,
+                total_consultas: 1
+            },
+            {
+                where: { id },
+                // Atualizamos também o último acesso para manter o perfil "vivo"
+                silent: false
+            }
+        );
+        // Atualiza a data de último acesso simultaneamente
+        await this.updateLastAccess(id);
+    }
 }

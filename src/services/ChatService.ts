@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { UserRepository } from '@/repositories/UserRepository.js';
 import { CompanyRepository } from '@/repositories/CompanyRepository.js';
+// IMPORT NOVO: Repositório de configurações de LLM
+import { LlmConfigRepository } from '@/repositories/LlmConfigRepository.js';
 import { UserNotFoundError, InternalServerError } from '@/errors/errors.js';
-import {AskQuestionDTO, ChatResponseDTO} from "@/dtos/ChatDTO.js";
+import { AskQuestionDTO, ChatResponseDTO } from "@/dtos/ChatDTO.js";
 import * as http from "node:http";
 import * as https from "node:https";
 
@@ -20,7 +22,6 @@ export class ChatService {
 
             // 2. VALIDAÇÃO SUTIL: Tratamento por Hierarquia (SaaS vs Admin)
             if (role !== 'SUPER-ADMIN') {
-                // Se for cliente (USER ou ADMIN), TEM que ter empresa e ela TEM que estar ativa
                 if (!companyId) {
                     throw new Error('Usuário não possui uma empresa vinculada para acessar a IA.');
                 }
@@ -35,21 +36,30 @@ export class ChatService {
                     throw new Error('O acesso desta empresa está suspenso.');
                 }
             } else {
-                // Se for SUPER-ADMIN, o companyId é null, mas passamos uma tag para a auditoria do Python
                 companyId = "matia-super-admin";
             }
 
-            // 3. Pegar a chave (MVP: .env | Futuro: lógica para puxar do banco se for cliente)
-            const clientApiKey = process.env.OPENAI_API_KEY;
+            // 3. 🔥 NOVO FLUXO: Buscar a IA Padrão do Banco de Dados
+            const config = await LlmConfigRepository.findPadrao();
+
+            // Trava de segurança: se o Super Admin desativar todas as IAs por engano
+            if (!config) {
+                throw new Error('Nenhuma configuração de Inteligência Artificial ativa foi encontrada no sistema.');
+            }
 
             // 4. Disparar a requisição para o motor RAG em Python
             const pythonResponse = await axios.post('http://103.204.193.6:4001/ask', {
                 question: dto.question,
                 user_id: userId,
                 company_id: companyId,
-                ia: "gemini",
-                ia_model: "gemini-2.5-flash",
-                client_api_key: process.env.GEMINI_API_KEY,
+
+                // 🔥 VARIÁVEIS DINÂMICAS: Injetando os dados do banco direto no Python
+                ia: config.ia,
+                ia_model: config.ia_model,
+                client_api_key: config.api_key,
+                temperature: config.temperatura, // Enviando a temperatura do banco
+                max_tokens: config.max_tokens,   // Enviando o limite de tokens
+
                 chat_history: [],
                 include_sources: true,
                 response_style: dto.response_style || "equilibrada"
@@ -58,21 +68,58 @@ export class ChatService {
                     'X-API-Key': process.env['MATIA_RAG_API_KEY'],
                     'Content-Type': 'application/json'
                 },
-                // Mantendo a proteção contra o proxy da dbseller que vimos no log
                 proxy: false,
                 httpAgent: new http.Agent({ keepAlive: true }),
                 httpsAgent: new https.Agent({ keepAlive: true })
             });
 
+
             // 5. Retornar no contrato exigido
+            const data = pythonResponse.data;
+
+// 🚀 NOVA IMPLEMENTAÇÃO: Atualizar as estatísticas do perfil no banco
+            try {
+                await UserRepository.updateStats(
+                    userId,
+                    data.usage?.llm?.total_tokens || 0,
+                    data.cost?.total?.brl || 0
+                );
+            } catch (statsError) {
+                // Apenas logamos o erro para não quebrar a resposta do chat caso o update falhe
+                console.error(`[ChatService] Erro ao atualizar estatísticas do usuário ${userId}:`, statsError);
+            }
+
             return {
-                answer: pythonResponse.data.answer,
-                sources: pythonResponse.data.sources || [],
-                interaction_id: pythonResponse.data.metadata?.interaction_id?.toString() || "gerado-localmente"
+                answer: data.answer,
+                sources: data.sources || [],
+                interaction_id: data.metadata?.interaction_id?.toString() || "gerado-localmente",
+
+                usage: {
+                    llm: {
+                        total_tokens: data.usage?.llm?.total_tokens || 0,
+                        input_tokens: data.usage?.llm?.input_tokens || 0,
+                        output_tokens: data.usage?.llm?.output_tokens || 0,
+                        thoughts_tokens: data.usage?.llm?.thoughts_tokens
+                    }
+                },
+
+                // 💰 Bilhetagem
+                cost: {
+                    total: {
+                        brl: data.cost?.total?.brl || 0,
+                        usd: data.cost?.total?.usd || 0
+                    },
+                    exchange_rate: {
+                        usd_brl: data.cost?.exchange_rate?.usd_brl || 0
+                    }
+                },
+
+                // 🔍 Auditoria
+                confidence: data.confidence,
+                risk_level: data.risk_level
             };
 
         } catch (error: any) {
-            //Isso vai mostrar se é erro de chave, erro no Python ou erro de rede
             if (error.response) {
                 console.error(`[ChatService] Erro da API Python (${error.response.status}):`, JSON.stringify(error.response.data));
             } else {
