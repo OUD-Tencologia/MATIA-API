@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { UserRepository } from '@/repositories/UserRepository.js';
 import { CompanyRepository } from '@/repositories/CompanyRepository.js';
-// IMPORT NOVO: Repositório de configurações de LLM
 import { LlmConfigRepository } from '@/repositories/LlmConfigRepository.js';
+import { ChatRepository } from '@/repositories/ChatRepository.js';
 import { UserNotFoundError, InternalServerError } from '@/errors/errors.js';
 import { AskQuestionDTO, ChatResponseDTO } from "@/dtos/ChatDTO.js";
 import * as http from "node:http";
@@ -17,52 +17,49 @@ export class ChatService {
             if (!user) throw new UserNotFoundError(userId);
 
             const rawUser = user.get ? user.get({ plain: true }) : user;
-            const role = rawUser.role; // Capturamos o nível de acesso
+            const role = rawUser.role;
             let companyId = rawUser.empresa_id;
 
-            // 2. VALIDAÇÃO SUTIL: Tratamento por Hierarquia (SaaS vs Admin)
+            // 2. Validação de Empresa
             if (role !== 'SUPER-ADMIN') {
-                if (!companyId) {
-                    throw new Error('Usuário não possui uma empresa vinculada para acessar a IA.');
-                }
+                if (!companyId) throw new Error('Usuário não possui uma empresa vinculada para acessar a IA.');
 
                 const company = await CompanyRepository.findById(companyId);
-                if (!company) {
-                    throw new Error('Empresa vinculada ao usuário não encontrada.');
-                }
+                if (!company) throw new Error('Empresa vinculada ao usuário não encontrada.');
 
                 const rawCompany = company.get ? company.get({ plain: true }) : company;
-                if (rawCompany.active === false) {
-                    throw new Error('O acesso desta empresa está suspenso.');
-                }
+                if (rawCompany.active === false) throw new Error('O acesso desta empresa está suspenso.');
             } else {
-                companyId = "matia-super-admin";
+                companyId = null; // Ajustado: para admin não tem company_id atrelado à conversa
             }
 
-            // 3. 🔥 NOVO FLUXO: Buscar a IA Padrão do Banco de Dados
+            // 3. Buscar a IA Padrão do Banco de Dados
             const config = await LlmConfigRepository.findPadrao();
+            if (!config) throw new Error('Nenhuma configuração de Inteligência Artificial ativa foi encontrada no sistema.');
 
-            // Trava de segurança: se o Super Admin desativar todas as IAs por engano
-            if (!config) {
-                throw new Error('Nenhuma configuração de Inteligência Artificial ativa foi encontrada no sistema.');
-            }
+            // 🔥 4. NOVO FLUXO: Salvar a pergunta do usuário no banco ANTES de chamar o RAG
+            // (Assumindo que dto pode ter um conversation_id se for continuação de conversa)
+            const { conversationId } = await ChatRepository.salvarMensagemTexto(
+                userId,
+                companyId,
+                dto.question,
+                (dto as any).conversation_id || null
+            );
 
-            // 4. Disparar a requisição para o motor RAG em Python
+            // 5. Disparar a requisição para o motor RAG em Python
             const pythonResponse = await axios.post('http://103.204.193.6:4001/ask', {
                 question: dto.question,
                 user_id: userId,
-                company_id: companyId,
-
-                // 🔥 VARIÁVEIS DINÂMICAS: Injetando os dados do banco direto no Python
+                company_id: companyId || "matia-super-admin",
                 ia: config.ia,
                 ia_model: config.ia_model,
                 client_api_key: config.api_key,
-                temperature: config.temperatura, // Enviando a temperatura do banco
-                max_tokens: config.max_tokens,   // Enviando o limite de tokens
-
-                chat_history: [],
+                temperature: config.temperatura,
+                max_tokens: config.max_tokens,
+                chat_history: [], // TODO futuro: buscar histórico do banco se houver conversationId
                 include_sources: true,
-                response_style: dto.response_style || "equilibrada"
+                response_style: dto.response_style || "equilibrada",
+                jurisdicao: "federal"
             }, {
                 headers: {
                     'X-API-Key': process.env['MATIA_RAG_API_KEY'],
@@ -73,11 +70,16 @@ export class ChatService {
                 httpsAgent: new https.Agent({ keepAlive: true })
             });
 
-
-            // 5. Retornar no contrato exigido
             const data = pythonResponse.data;
 
-// 🚀 NOVA IMPLEMENTAÇÃO: Atualizar as estatísticas do perfil no banco
+            // 🔥 6. NOVO FLUXO: Salvar a resposta da IA no banco
+            await ChatRepository.salvarMensagemIA(
+                conversationId,
+                data.answer,
+                config.ia_model
+            );
+
+            // 7. Atualizar as estatísticas do perfil no banco
             try {
                 await UserRepository.updateStats(
                     userId,
@@ -85,7 +87,6 @@ export class ChatService {
                     data.cost?.total?.brl || 0
                 );
             } catch (statsError) {
-                // Apenas logamos o erro para não quebrar a resposta do chat caso o update falhe
                 console.error(`[ChatService] Erro ao atualizar estatísticas do usuário ${userId}:`, statsError);
             }
 
@@ -93,6 +94,8 @@ export class ChatService {
                 answer: data.answer,
                 sources: data.sources || [],
                 interaction_id: data.metadata?.interaction_id?.toString() || "gerado-localmente",
+                // 💡 Mandamos o ID da conversa de volta pro Angular saber onde encaixar as próximas mensagens!
+                conversation_id: conversationId,
 
                 usage: {
                     llm: {
@@ -102,8 +105,6 @@ export class ChatService {
                         thoughts_tokens: data.usage?.llm?.thoughts_tokens
                     }
                 },
-
-                // 💰 Bilhetagem
                 cost: {
                     total: {
                         brl: data.cost?.total?.brl || 0,
@@ -113,8 +114,6 @@ export class ChatService {
                         usd_brl: data.cost?.exchange_rate?.usd_brl || 0
                     }
                 },
-
-                // 🔍 Auditoria
                 confidence: data.confidence,
                 risk_level: data.risk_level
             };
@@ -125,7 +124,6 @@ export class ChatService {
             } else {
                 console.error(`[ChatService] Falha na integração RAG:`, error.message || error);
             }
-
             throw new InternalServerError('Não foi possível processar a dúvida jurídica neste momento.', { originalError: error.message });
         }
     }

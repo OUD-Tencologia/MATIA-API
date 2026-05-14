@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { ChatMatiaController } from '../controllers/ChatMatiaController.js';
+import type { AskQuestionDTO } from '@/dtos/ChatDTO.js';
 
 const chatMatiaRoutes = async (fastify: FastifyInstance) => {
 
-    // Rota principal para a IA responder (O motor do RAG)
-    fastify.post(
+
+    fastify.post<{ Body: AskQuestionDTO }>(
         '/matia/ask',
         {
             schema: {
@@ -13,7 +14,6 @@ const chatMatiaRoutes = async (fastify: FastifyInstance) => {
                 description: 'Envia a pergunta para o motor Python, valida a empresa/SaaS e retorna a resposta com fontes.',
                 security: [{ bearerAuth: [] }],
             },
-            // 🌟 Usamos o mesmo middleware de autenticação que o projeto já possui
             preHandler: [fastify.authenticate],
         },
         ChatMatiaController.askQuestion

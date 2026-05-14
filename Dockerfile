@@ -10,6 +10,10 @@ ENV TZ=America/Cuiaba
 
 COPY . .
 
+# Build do TypeScript
+RUN npm run build
+
 EXPOSE 3002
 
-CMD ["npm", "run", "dev"]
+# Produção: roda o JS compilado
+CMD ["npm", "run", "start"]
