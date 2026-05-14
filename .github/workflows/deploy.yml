@@ -25,6 +25,7 @@ jobs:
             cd ~/apps/matia-api
 
             echo "🔄 Atualizando código..."
+            git reset --hard
             git pull origin master
 
             echo "🐳 Rebuild e restart do servidor..."
