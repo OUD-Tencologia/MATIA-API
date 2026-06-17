@@ -1,5 +1,5 @@
 import type { FastifyRequest } from 'fastify'
-import messages, { type MessagesAttributes } from '../models/messages.js'
+import { MessageService } from '../services/MessageService.js'
 import {
   ValidationError,
   MissingFieldError,
@@ -10,43 +10,35 @@ import {
 import { ErrorCodes } from '../errors/errorCodes.js'
 import { successResponse } from '../utils/response.js'
 
-interface CreateBody
-  extends Omit<MessagesAttributes, 'id' | 'created_at' | 'updated_at'> {}
-
-interface UpdateBody extends Partial<CreateBody> {}
-
-interface Params {
-  id: string
+interface CreateBody {
+  conversations_id: string
+  content: string
+  role: 'user' | 'assistant' | 'system'
+  metadata?: object | null
 }
+interface UpdateBody extends Partial<CreateBody> {}
+interface Params { id: string }
 
 export const createMessages = async (request: FastifyRequest) => {
   try {
     const payload = request.body as CreateBody
-    if (!payload || Object.keys(payload).length === 0) {
-      throw new MissingFieldError()
-    }
-    const created = await messages.create(payload as any)
-    const data = created.toJSON()
-    return successResponse(data, 'Registro criado com sucesso')
+    if (!payload || Object.keys(payload).length === 0) throw new MissingFieldError()
+
+    const data = await MessageService.create(payload)
+    return successResponse(data, 'Mensagem criada com sucesso')
   } catch (err: any) {
-    if (err && err.name === 'SequelizeValidationError') {
-      throw new ValidationError('Dados inválidos', {
-        code: ErrorCodes.VALIDATION_ERROR,
-      })
+    if (err?.name === 'SequelizeValidationError') {
+      throw new ValidationError('Dados inválidos', { code: ErrorCodes.VALIDATION_ERROR })
     }
-    throw new InternalServerError('Erro a criar o registro', {
-      code: ErrorCodes.CREATE_FAILED,
-    })
+    throw new InternalServerError('Erro ao criar a mensagem', { code: ErrorCodes.CREATE_FAILED })
   }
 }
 
 export const getMessagesById = async (request: FastifyRequest) => {
   try {
     const { id } = request.params as Params
-    const item = await messages.findByPk(id)
-    const data = item?.toJSON()
-    if (!item) throw new DocumentNotFoundError()
-    return successResponse(data, 'Registro encontrado com sucesso')
+    const data = await MessageService.findById(id)
+    return successResponse(data, 'Mensagem encontrada com sucesso')
   } catch (err: any) {
     throw new DocumentNotFoundError()
   }
@@ -54,11 +46,9 @@ export const getMessagesById = async (request: FastifyRequest) => {
 
 export const getMessages = async () => {
   try {
-    const item = await messages.findAll()
-    if (item.length === 0) {
-      return successResponse([], 'nenhum Messages encontrado')
-    }
-    return successResponse(item, 'listando todos os Messages')
+    const items = await MessageService.findAll()
+    if (items.length === 0) return successResponse([], 'Nenhuma mensagem encontrada')
+    return successResponse(items, 'Listando todas as mensagens')
   } catch (err: any) {
     throw new DataBaseError()
   }
@@ -67,47 +57,32 @@ export const getMessages = async () => {
 export const updateMessages = async (request: FastifyRequest) => {
   try {
     const { id } = request.params as Params
-    const { role } = request.body as UpdateBody
-    if (role && !['user', 'assistant', 'system'].includes(role)) {
-      throw new ValidationError('Role inválido', {
-        code: ErrorCodes.VALIDATION_ERROR,
-      })
-    }
-    const [updatedRows] = await messages.update(request.body as UpdateBody, {
-      where: { id },
-    })
-    if (updatedRows === 0) throw new DocumentNotFoundError()
-    const updated = await messages.findByPk(id)
-    const data = updated?.toJSON()
-    return successResponse(data, 'Documento encontrado com sucesso')
+    const data = await MessageService.update(id, request.body as UpdateBody)
+    return successResponse(data, 'Mensagem atualizada com sucesso')
   } catch (err: any) {
-    if (err && err.name === 'SequelizeValidationError') {
-      throw new ValidationError('Dados inválidos', {
-        code: ErrorCodes.VALIDATION_ERROR,
-      })
+    if (err instanceof DocumentNotFoundError) throw err
+    if (err?.name === 'SequelizeValidationError') {
+      throw new ValidationError('Dados inválidos', { code: ErrorCodes.VALIDATION_ERROR })
     }
-    throw new InternalServerError('Erro ao atualizar o documento', {
-      code: ErrorCodes.UPDATE_FAILED,
-    })
+    throw new InternalServerError('Erro ao atualizar a mensagem', { code: ErrorCodes.UPDATE_FAILED })
   }
 }
 
 export const deleteMessages = async (request: FastifyRequest) => {
   try {
     const { id } = request.params as Params
-    const deleted = await messages.destroy({ where: { id } })
-    if (deleted === 0) throw new DocumentNotFoundError()
-    return successResponse('Documento deletado com sucesso')
+    await MessageService.delete(id)
+    return successResponse('Mensagem deletada com sucesso')
   } catch (err: any) {
-    throw new ValidationError('Erro ao deletar o documentos', {
-      code: ErrorCodes.DELETE_FAILED,
-    })
+    if (err instanceof DocumentNotFoundError) throw err
+    throw new InternalServerError('Erro ao deletar a mensagem', { code: ErrorCodes.DELETE_FAILED })
   }
 }
 
 export default {
   createMessages,
   getMessagesById,
+  getMessages,
   updateMessages,
   deleteMessages,
 }

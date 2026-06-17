@@ -5,6 +5,8 @@ import swagger from '@fastify/swagger'
 import fastifyEnv from '@fastify/env'
 import cookie from '@fastify/cookie';
 import { rateLimitPlugin } from './plugins/ratelimit.js'
+import multipart from '@fastify/multipart'
+
 import authenticate from './plugins/authPlugin.js'
 import swaggerUi from '@fastify/swagger-ui'
 import type { FastifyInstance } from 'fastify'
@@ -39,6 +41,7 @@ import { helmetPlugin } from './plugins/helmet.js'
 import { cachePlugin } from './plugins/cachePlugin.js'
 import { setupAssociations } from "./models/setupAssociations.js";
 import llmConfigRoutes from "./routes/llmConfigRoutes.js";
+
 
 const fastify: FastifyInstance = Fastify({
   logger: {
@@ -107,6 +110,11 @@ await fastify.register(cookie, {
 await fastify.register(helmetPlugin)
 await fastify.register(cachePlugin)
 await fastify.register(rateLimitPlugin)
+await fastify.register(multipart, {
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB
+  }
+})
 
 fastify.setErrorHandler(errorHandler)
 setupGlobalErrorHandlers(fastify.log)

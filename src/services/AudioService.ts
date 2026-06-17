@@ -39,7 +39,7 @@ export class AudioService {
 
             // C. Retorno completo para o Angular
             return {
-                text: saveResult.conversationId,
+                text: texto,
                 conversationId: saveResult.conversationId
             };
 

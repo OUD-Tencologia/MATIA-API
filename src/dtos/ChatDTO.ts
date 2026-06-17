@@ -3,7 +3,7 @@
 export interface AskQuestionDTO {
     question: string;
     conversation_id?: string;
-    response_style?: 'objetiva' | 'equilibrada' | 'detalhada';
+    response_style?: 'objetiva' | 'equilibrada' | 'detalhada' | 'didatica';
 }
 
 export interface SourceDTO {
