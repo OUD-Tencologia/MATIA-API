@@ -7,7 +7,6 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// força o carregamento do .env
 config({ path: path.resolve(__dirname, '../.env') })
 
 console.log('DB_PASS tipo:', typeof process.env.DB_PASS)
@@ -23,30 +22,32 @@ const sequelize = new Sequelize({
 })
 
 const umzug = new Umzug({
-  migrations: {
-    glob: 'migrations/*.ts',
-    resolve: ({ name, path: migrationPath, context }) => {
-      if (!migrationPath) {
-        throw new Error(`Migration path is undefined for ${name}`)
-      }
-      const absolutePath = path.resolve(__dirname, '..', migrationPath)
-      return {
-        name,
-        up: async () => {
-          const { up } = await import(absolutePath)
-          return up(context)
+      migrations: {
+        glob: 'migrations/*.ts',
+        resolve: ({ name, path: migrationPath, context }) => {
+          if (!migrationPath) {
+            throw new Error(`Migration path is undefined for ${name}`)
+          }
+          const absolutePath = path.resolve(__dirname, '..', migrationPath)
+          return {
+            name,
+            up: async () => {
+              const migration = await import(absolutePath)
+              const up = migration.default?.up ?? migration.up
+              return up(context)
+            },
+            down: async () => {
+              const migration = await import(absolutePath)
+              const down = migration.default?.down ?? migration.down
+              return down(context)
+            },
+          }
         },
-        down: async () => {
-          const { down } = await import(absolutePath)
-          return down(context)
-        },
-      }
-    },
-  },
-  context: sequelize.getQueryInterface(),
-  storage: new SequelizeStorage({ sequelize }),
-  logger: console,
-})
+      },
+      context: sequelize.getQueryInterface(),
+      storage: new SequelizeStorage({ sequelize }),
+      logger: console,
+    })
 
 ;(async () => {
   await umzug.up()
