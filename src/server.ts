@@ -137,9 +137,7 @@ await fastify.register(cors, {
     'http://localhost:4200',
     'http://localhost:3000',
     'http://localhost:5173',
-    'http://103.204.193.6',
-    'http://103.204.193.6:80',
-    'http://103.204.193.6:42502',// Garantia para porta 80 explícita
+    'http://192.168.17.22',
     'https://matia-legal-ai.vercel.app',
     'https://www.matia.com.br',
   ],
@@ -162,14 +160,8 @@ await fastify.register(swagger, {
     },
     servers: [
       {
-        // Ajustado para a porta externa 42503 na VPS!
-        url: isProduction ? 'http://103.204.193.6:42503' : 'http://localhost:3002',
+        url: isProduction ? 'http://192.168.17.22/api' : 'http://localhost:3002',
         description: isProduction ? 'Servidor de Produção (VPS)' : 'Ambiente Local',
-      },
-      {
-
-        url: isProduction ? 'http://localhost:3002' : 'http://103.204.193.6:42503',
-        description: isProduction ? 'Ambiente Local' : 'Servidor de Produção (VPS)',
       }
     ],
 
@@ -223,8 +215,8 @@ const start = async () => {
     // Host 0.0.0.0 é fundamental para o Docker
     await fastify.listen({ port: 3002, host: '0.0.0.0' })
 
-    fastify.log.info(`Servidor rodando em: http://103.204.193.6:3002`)
-    fastify.log.info(`Documentação: http://103.204.193.6:3002/docs`)
+    fastify.log.info(`Servidor rodando em: http://192.168.17.22`)
+    fastify.log.info(`Documentação: http://192.168.17.22/docs`)
   } catch (err) {
     fastify.log.error(err)
     process.exit(1)
