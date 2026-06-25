@@ -22,13 +22,14 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            cd ~/apps/matia-api
+            cd ~/matia/backend
 
             echo "🔄 Atualizando código..."
             git reset --hard
-            git pull origin master
+            git pull origin main
 
             echo "🐳 Rebuild e restart do servidor..."
+            cd ~/matia
             docker compose up -d --build server
 
             echo "🧹 Limpando imagens antigas..."
