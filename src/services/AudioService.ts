@@ -36,7 +36,7 @@ export class AudioService {
                 texto,
                 conversationId
             );
-
+            //teste de worklow
             // C. Retorno completo para o Angular
             return {
                 text: texto,
