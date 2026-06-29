@@ -10,8 +10,7 @@ import { UserNotFoundError, InternalServerError, DocumentNotFoundError } from '.
 import type { UploadDocumentDTO, AskDocumentDTO, UploadDocumentResponseDTO, AskDocumentResponseDTO } from '../dtos/DocumentDTO.js'
 import * as http from 'node:http'
 import * as https from 'node:https'
-
-const RAG_BASE_URL = 'http://host.docker.internal:4001'
+import { getRagBaseUrl } from '../config/rag.js'
 
 const httpAgents = {
     httpAgent: new http.Agent({ keepAlive: true }),
@@ -97,7 +96,7 @@ export class DocumentService {
             form.append('user_id', userId)
             form.append('title', originalName)
 
-            const ragResponse = await axios.post(`${RAG_BASE_URL}/documents/upload`, form, {
+            const ragResponse = await axios.post(`${getRagBaseUrl()}/documents/upload`, form, {
                 headers: {
                     ...form.getHeaders(),
                     'X-API-Key': process.env['MATIA_RAG_API_KEY'],
@@ -199,7 +198,7 @@ export class DocumentService {
             await ChatRepository.salvarMensagemTexto(userId, companyId, dto.question, dto.conversation_id)
 
             // 6. Chamar o RAG
-            const ragResponse = await axios.post(`${RAG_BASE_URL}/documents/ask`, {
+            const ragResponse = await axios.post(`${getRagBaseUrl()}/documents/ask`, {
                 question: dto.question,
                 company_id: companyId || 'matia-super-admin',
                 document_ids: ragDocumentIds,

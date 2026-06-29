@@ -597,3 +597,15 @@ Profile (1) ────────── (N) UserRole
 - GitHub: [@gedsss](https://github.com/gedsss)
 
 ---
+# Integração com MATIA Agentic RAG
+
+O Backend Core usa `MATIA_RAG_BASE_URL` para `/ask`, `/documents/upload` e
+`/documents/ask`. Na VPS compartilhada, configure:
+
+```dotenv
+MATIA_RAG_BASE_URL=http://api-rag:8001
+MATIA_RAG_API_KEY=<mesma API_KEY configurada no api-rag>
+```
+
+Não grave a gateway key no repositório. O alias `api-rag` é resolvido pela rede
+Docker compartilhada; a API RAG não precisa ser publicada no nginx.
