@@ -1,0 +1,50 @@
+name: Backend Core CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-core-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Testes, build e imagem
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci --legacy-peer-deps
+
+      - name: Testes
+        run: npm test
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Auditoria de dependências de produção
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build da imagem
+        run: docker build --tag "matia-backend:${GITHUB_SHA}" .
+
+      - name: Validar artefato da imagem
+        run: |
+          docker run --rm --entrypoint sh "matia-backend:${GITHUB_SHA}" -c \
+            "test -f /app/dist/config/rag.js && ! grep -R 'host.docker.internal:4001' /app/dist/services /app/dist/config"

@@ -1,29 +1,103 @@
-name: Deploy para VPS
+name: Deploy Backend Core para VPS
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      deploy_sha:
+        description: SHA completo do commit atual de main
+        required: true
+        type: string
+      confirmation:
+        description: Digite DEPLOY-MATIA-CORE para confirmar
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: matia-backend-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Build & Deploy
+    name: Validar e implantar
     runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout do código
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: main
 
-      - name: Atualizar código
+      - name: Validar SHA de produção
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+          TARGET_SHA: ${{ inputs.deploy_sha }}
+        shell: bash
         run: |
-          cd ~/matia/backend
-          git reset --hard
-          git pull origin main
+          set -euo pipefail
+          test "${CONFIRMATION}" = "DEPLOY-MATIA-CORE"
+          [[ "${TARGET_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          git fetch origin main
+          test "$(git rev-parse origin/main)" = "${TARGET_SHA}"
+          git cat-file -e "${TARGET_SHA}^{commit}"
 
-      - name: Rebuild e restart do servidor
+      - name: Testar e compilar
+        shell: bash
         run: |
-          cd ~/matia
-          docker compose up -d --build server
+          set -euo pipefail
+          npm ci --legacy-peer-deps
+          npm test
+          npm run build
+          npm audit --omit=dev --audit-level=high
 
-      - name: Limpar imagens antigas
-        run: docker image prune -f
+      - name: Implantar com rollback
+        env:
+          TARGET_SHA: ${{ inputs.deploy_sha }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          app_root="${HOME}/matia"
+          repo="${app_root}/backend"
+          previous_sha="$(git -C "${repo}" rev-parse HEAD)"
+
+          rollback() {
+            status="$?"
+            trap - ERR
+            echo "Deploy falhou; restaurando ${previous_sha}." >&2
+            git -C "${repo}" checkout --detach "${previous_sha}"
+            cd "${app_root}"
+            docker compose build server
+            docker compose up -d --no-deps --force-recreate server
+            exit "${status}"
+          }
+          trap rollback ERR
+
+          git -C "${repo}" fetch origin main
+          test "$(git -C "${repo}" rev-parse origin/main)" = "${TARGET_SHA}"
+          git -C "${repo}" checkout --detach "${TARGET_SHA}"
+          test -z "$(git -C "${repo}" status --porcelain)"
+
+          cd "${app_root}"
+          docker compose build server
+          docker compose up -d --no-deps --force-recreate server
+
+          for _ in $(seq 1 45); do
+            if docker logs matia-server-1 2>&1 | grep -q 'Server listening'; then
+              break
+            fi
+            sleep 2
+          done
+
+          test "$(docker inspect matia-server-1 --format '{{.State.Status}}')" = "running"
+          docker exec matia-server-1 sh -lc \
+            "test -f /app/dist/config/rag.js && ! grep -R 'host.docker.internal:4001' /app/dist/services /app/dist/config"
+          docker exec matia-server-1 node --input-type=module -e \
+            "const base=process.env.MATIA_RAG_BASE_URL; if(base!=='http://api-rag:8001') throw new Error('MATIA_RAG_BASE_URL inválida'); const response=await fetch(base+'/health/ready'); const body=await response.json(); if(!response.ok||body.status!=='ok') throw new Error('API-Rag indisponível');"
+
+          trap - ERR
+          echo "Backend Core implantado em ${TARGET_SHA}."

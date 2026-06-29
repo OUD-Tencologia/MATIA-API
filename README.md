@@ -20,6 +20,8 @@ API REST desenvolvida com **Fastify + TypeScript** para o sistema **Matia Legal 
 - [Documentação Swagger](#-documentação-swagger)
 - [Banco de Dados](#-banco-de-dados)
 - [Scripts Disponíveis](#-scripts-disponíveis)
+- [Produção na VPN](#-produção-na-vpn)
+- [CI/CD](#cicd)
 - [Contribuindo](#-contribuindo)
 
 ---
@@ -28,7 +30,7 @@ API REST desenvolvida com **Fastify + TypeScript** para o sistema **Matia Legal 
 
 | Tecnologia | Versão | Descrição |
 |------------|--------|-----------|
-| **Node.js** | 18+ | Runtime JavaScript (ESM) |
+| **Node.js** | 20 | Runtime JavaScript (ESM) |
 | **TypeScript** | 5.x | Tipagem estática |
 | **Fastify** | 5.x | Framework web de alta performance |
 | **Sequelize** | 6.x | ORM para PostgreSQL |
@@ -58,14 +60,13 @@ API REST desenvolvida com **Fastify + TypeScript** para o sistema **Matia Legal 
 | `zod` | Validação declarativa de schemas |
 | `sequelize` | ORM para banco de dados relacional |
 | `pg` | Driver PostgreSQL para Node.js |
-| `bcrypt` | Hash seguro de senhas com salt |
+| `bcryptjs` | Hash seguro de senhas com salt |
 | `cpf-cnpj-validator` | Validação de CPF/CNPJ brasileiros |
 | `openai` | Integração com API da OpenAI (LLM) |
 | `uuid` | Geração de identificadores únicos |
 | `umzug` | Runner de migrations Sequelize |
 | `glob` | Localização de arquivos por padrões |
 | `yamljs` | Parsing de arquivos YAML |
-| `sqlite3` | Banco SQLite (utilizado em testes) |
 
 ### Dependências de Desenvolvimento
 
@@ -81,6 +82,7 @@ API REST desenvolvida com **Fastify + TypeScript** para o sistema **Matia Legal 
 | `sequelize-cli` | CLI para criação e execução de migrations |
 | `c8` | Gerador de relatórios de cobertura |
 | `tsconfig-paths` | Suporte a path aliases do TypeScript |
+| `sqlite3` | Banco SQLite utilizado somente em testes |
 
 ---
 
@@ -580,6 +582,83 @@ Profile (1) ────────── (N) UserRole
 
 ---
 
+## 🔐 Produção na VPN
+
+O Backend Core roda na VM privada do MATIA e compartilha a rede Docker
+`matia_default` com PostgreSQL, Redis, MinIO, nginx e a API-Rag.
+
+```text
+VPN / nginx
+    |
+    +-- Backend Core (server:3002)
+            |
+            +-- PostgreSQL (postgres:5432)
+            +-- Redis (redis:6379)
+            +-- MinIO (minio:9000)
+            +-- API-Rag (api-rag:8001)
+```
+
+A integração RAG não usa IP público nem `host.docker.internal`. Configure no
+arquivo `.env` da stack, fora do Git:
+
+```dotenv
+MATIA_RAG_BASE_URL=http://api-rag:8001
+MATIA_RAG_API_KEY=<mesma API_KEY configurada na API-Rag>
+```
+
+`MATIA_RAG_BASE_URL` é usada por:
+
+- `POST /api/matia/ask`;
+- `POST /api/documents/upload`;
+- `POST /api/documents/ask`.
+
+A API-Rag permanece publicada no host apenas em `127.0.0.1:4001`. O tráfego do
+Backend Core usa o alias `api-rag:8001` dentro da rede Docker.
+
+### Validação local
+
+```bash
+npm ci --legacy-peer-deps
+npm test
+npm run build
+npm audit --omit=dev --audit-level=high
+docker build -t matia-backend:local .
+```
+
+O build deve gerar `/app/dist/config/rag.js` e não pode conter referência a
+`host.docker.internal:4001`.
+
+## CI/CD
+
+O workflow `Backend Core CI` roda automaticamente em pull requests e em pushes
+para `main`. Ele executa testes, build TypeScript, auditoria de dependências,
+build da imagem e valida o artefato compilado.
+
+Deploy de produção não ocorre automaticamente após um push. Use o workflow
+`Deploy Backend Core para VPS` por `workflow_dispatch` e informe:
+
+- `deploy_sha`: SHA completo que deve ser exatamente o HEAD atual de `main`;
+- `confirmation`: `DEPLOY-MATIA-CORE`.
+
+O deploy manual:
+
+1. valida o SHA contra `origin/main`;
+2. repete testes, build e auditoria;
+3. atualiza o checkout produtivo em `~/matia/backend`;
+4. reconstrói apenas o serviço `server`;
+5. verifica o artefato compilado e a conectividade com `api-rag:8001`;
+6. restaura o SHA anterior se alguma etapa falhar.
+
+Após o workflow, confirme na VM:
+
+```bash
+git -C ~/matia/backend rev-parse HEAD
+cd ~/matia && docker compose ps server
+curl -fsS http://127.0.0.1:4001/health/ready
+```
+
+---
+
 ## 🤝 Contribuindo
 
 1. Faça um fork do projeto
@@ -595,17 +674,3 @@ Profile (1) ────────── (N) UserRole
 **gedsss**
 
 - GitHub: [@gedsss](https://github.com/gedsss)
-
----
-# Integração com MATIA Agentic RAG
-
-O Backend Core usa `MATIA_RAG_BASE_URL` para `/ask`, `/documents/upload` e
-`/documents/ask`. Na VPS compartilhada, configure:
-
-```dotenv
-MATIA_RAG_BASE_URL=http://api-rag:8001
-MATIA_RAG_API_KEY=<mesma API_KEY configurada no api-rag>
-```
-
-Não grave a gateway key no repositório. O alias `api-rag` é resolvido pela rede
-Docker compartilhada; a API RAG não precisa ser publicada no nginx.
