@@ -11,7 +11,7 @@ import type { UploadDocumentDTO, AskDocumentDTO, UploadDocumentResponseDTO, AskD
 import * as http from 'node:http'
 import * as https from 'node:https'
 
-const RAG_BASE_URL = 'http://103.204.193.6:4001'
+const RAG_BASE_URL = 'http://host.docker.internal:4001'
 
 const httpAgents = {
     httpAgent: new http.Agent({ keepAlive: true }),
