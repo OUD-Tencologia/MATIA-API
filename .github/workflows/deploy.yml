@@ -8,31 +8,22 @@ on:
 jobs:
   deploy:
     name: Build & Deploy
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            cd ~/matia/backend
+      - name: Atualizar código
+        run: |
+          cd ~/matia/backend
+          git reset --hard
+          git pull origin main
 
-            echo "🔄 Atualizando código..."
-            git reset --hard
-            git pull origin main
+      - name: Rebuild e restart do servidor
+        run: |
+          cd ~/matia
+          docker compose up -d --build server
 
-            echo "🐳 Rebuild e restart do servidor..."
-            cd ~/matia
-            docker compose up -d --build server
-
-            echo "🧹 Limpando imagens antigas..."
-            docker image prune -f
-
-            echo "✅ Deploy concluído!"
+      - name: Limpar imagens antigas
+        run: docker image prune -f
