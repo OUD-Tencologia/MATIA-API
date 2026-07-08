@@ -1,29 +1,25 @@
 import nodemailer from 'nodemailer';
 
 export class MailService {
-    // Configuração do transportador lendo SMTP_* do seu .env
     private static transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST,
         port: Number(process.env.SMTP_PORT),
-        secure: true,
+        secure: process.env.SMTP_SECURE === 'true',
         auth: {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS,
         },
         tls: {
-            rejectUnauthorized: false
+            rejectUnauthorized: false,
+            ciphers: 'SSLv3'
         }
     });
 
-
-     // Envia o e-mail com o link de recuperação
     static async sendPasswordResetEmail(to: string, token: string) {
-        // Link que o usuário clicará no Angular
         const baseUrl = process.env.FRONTEND_URL;
         const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
         const mailOptions = {
-            // Usa o MAIL_FROM que você declarou no .env
             from: process.env.MAIL_FROM,
             to,
             subject: 'Recuperação de Senha - MATIA',
