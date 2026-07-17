@@ -9,6 +9,7 @@ import { UserNotFoundError, InternalServerError } from '../errors/errors.js';
 import { AskQuestionDTO, ChatResponseDTO } from "../dtos/ChatDTO.js";
 import * as http from "node:http";
 import * as https from "node:https";
+import { getRagBaseUrl } from '../config/rag.js';
 
 export class ChatService {
 
@@ -48,8 +49,8 @@ export class ChatService {
                 (dto as any).conversation_id || null
             );
 
-            // 6. Chamar o RAG
-            const pythonResponse = await axios.post('http://host.docker.internal:4001/ask', {
+            // 6. Chamar o RAG (URL ALTERADA AQUI)
+            const pythonResponse = await axios.post(`${getRagBaseUrl()}/ask`, {
                 question: dto.question,
                 user_id: userId,
                 company_id: companyId || "matia-super-admin",
