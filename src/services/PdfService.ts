@@ -3,23 +3,17 @@ import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
 
 const require = createRequire(import.meta.url);
 
+// Extração do módulo mantendo sua estrutura
 const pdfMakeModule = require('pdfmake/build/pdfmake.js');
-// Importante: Usamos o arquivo de fontes para evitar que ele tente baixar via rede
-const vfsFontsModule = require('pdfmake/build/vfs_fonts.js');
-
 const pdfMake = pdfMakeModule.pdfMake || pdfMakeModule.default || pdfMakeModule;
-const vfs = vfsFontsModule.vfs || vfsFontsModule.pdfMake?.vfs || vfsFontsModule;
 
-pdfMake.vfs = vfs;
-
-// Configuração crucial: Usar a fonte base "Roboto" padrão do pacote vfs_fonts
-// Evite usar Helvetica aqui se o pacote vfs não tiver os dados da Helvetica configurados.
+// Fonte NATIVA: Helvetica não exige arquivos .ttf, eliminando o travamento do Docker
 pdfMake.fonts = {
-    Roboto: {
-        normal: 'Roboto-Regular.ttf',
-        bold: 'Roboto-Medium.ttf',
-        italics: 'Roboto-Italic.ttf',
-        bolditalics: 'Roboto-MediumItalic.ttf',
+    Helvetica: {
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique',
     }
 };
 
@@ -89,7 +83,7 @@ export class PdfService {
 
         const docDefinition: TDocumentDefinitions = {
             content,
-            defaultStyle: { font: 'Roboto', fontSize: 11, lineHeight: 1.3 },
+            defaultStyle: { font: 'Helvetica', fontSize: 11, lineHeight: 1.3 },
             styles: {
                 header: { fontSize: 18, bold: true, margin: [0, 0, 0, 16] },
                 subheader: { fontSize: 14, bold: true, margin: [0, 12, 0, 6] },
@@ -107,14 +101,12 @@ export class PdfService {
 
         return await new Promise<Buffer>((resolve, reject) => {
             try {
-                // Nova abordagem para garantir que recebemos o buffer corretamente
-                pdfDocGenerator.getBuffer((buffer: any) => {
-                    if (buffer) {
-                        resolve(buffer as Buffer);
-                    } else {
-                        reject(new Error("Erro: O buffer retornado pelo pdfmake estava vazio."));
-                    }
+                const result = pdfDocGenerator.getBuffer((buffer: any) => {
+                    if (buffer) resolve(buffer as Buffer);
                 });
+                if (result instanceof Promise) {
+                    result.then((buffer: any) => resolve(buffer as Buffer)).catch(reject);
+                }
             } catch (err) {
                 reject(err);
             }
