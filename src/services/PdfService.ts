@@ -2,16 +2,17 @@ import { createRequire } from 'module';
 import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
 
 const require = createRequire(import.meta.url);
-const pdfMakeRaw = require('pdfmake');
 
-// Extração segura do construtor: verifica todas as formas possíveis que o Node pode exportar
-const PdfPrinterClass = typeof pdfMakeRaw === 'function'
-    ? pdfMakeRaw
-    : (pdfMakeRaw.default || pdfMakeRaw.PdfPrinter || pdfMakeRaw.Printer);
+// Bypass definitivo: Acessamos o arquivo original da classe dentro do pacote
+// Isso evita qualquer problema de empacotamento ESM/CommonJS que o Node está causando
+let PdfPrinterClass: any;
+try {
+    PdfPrinterClass = require('pdfmake/src/printer.js');
+} catch (e) {
+    const raw = require('pdfmake');
+    PdfPrinterClass = typeof raw === 'function' ? raw : (raw.default || raw.PdfPrinter || raw);
+}
 
-// Importante: No ambiente de servidor (Docker), o caminho das fontes precisa
-// apontar fisicamente para onde os arquivos .ttf estão no contêiner.
-// Se ocorrer erro "ENOENT" no próximo log, coloque o caminho absoluto (ex: '/app/fonts/Roboto-Regular.ttf')
 const fonts = {
     Roboto: {
         normal: 'Roboto-Regular.ttf',
@@ -25,8 +26,7 @@ export class PdfService {
 
     static isPdfRequest(question: string): boolean {
         const keywords = [
-            'pdf',
-            'gerar documento', 'gere um documento', 'criar documento', 'crie um documento',
+            'pdf', 'gerar documento', 'gere um documento', 'criar documento', 'crie um documento',
             'gerar parecer', 'gere um parecer', 'emitir parecer', 'elaborar parecer',
             'gerar relatorio', 'gere um relatorio', 'criar relatorio',
             'gerar resumo', 'gere um resumo', 'resumo em documento',
@@ -64,7 +64,7 @@ export class PdfService {
         if (q.includes('relatorio') || q.includes('relacao')) return 'Relatório Jurídico';
         if (q.includes('resumo')) return 'Resumo Jurídico';
         if (q.includes('contrato')) return 'Análise de Contrato';
-        if (q.includes('peticao') || q.includes('peticao')) return 'Petição';
+        if (q.includes('peticao')) return 'Petição';
         if (q.includes('notificacao')) return 'Notificação';
         if (q.includes('recurso')) return 'Recurso';
         if (q.includes('defesa')) return 'Defesa';
@@ -78,47 +78,40 @@ export class PdfService {
     }
 
     static generateFromText(text: string, options?: { title?: string }): Promise<Buffer> {
-        // No Node.js, apenas instanciamos passando o caminho das fontes físicas
-        const printer = new PdfPrinterClass(fonts);
-
-        const content: Content[] = [];
-
-        if (options?.title) {
-            content.push({ text: options.title, style: 'header' });
-        }
-
-        content.push(...this.markdownToContent(text));
-
-        const docDefinition: TDocumentDefinitions = {
-            content,
-            defaultStyle: {
-                font: 'Roboto',
-                fontSize: 11,
-                lineHeight: 1.3,
-            },
-            styles: {
-                header: {
-                    fontSize: 18,
-                    bold: true,
-                    margin: [0, 0, 0, 16],
-                },
-                subheader: {
-                    fontSize: 14,
-                    bold: true,
-                    margin: [0, 12, 0, 6],
-                },
-            },
-            pageMargins: [40, 60, 40, 60],
-            footer: (currentPage: number, pageCount: number) => ({
-                text: `Página ${currentPage} de ${pageCount}`,
-                alignment: 'center',
-                fontSize: 8,
-                margin: [0, 10, 0, 0],
-            }),
-        };
-
         return new Promise((resolve, reject) => {
             try {
+                // Trava de segurança: Se falhar, cospe a estrutura real no terminal
+                if (typeof PdfPrinterClass !== 'function') {
+                    console.error(">>> DEBUG CRÍTICO: O pacote pdfmake não exportou a função construtora.");
+                    console.error(">>> ESTRUTURA RECEBIDA:", Object.keys(PdfPrinterClass));
+                    throw new Error(`PdfPrinterClass falhou. Tipo lido: ${typeof PdfPrinterClass}`);
+                }
+
+                const printer = new PdfPrinterClass(fonts);
+                const content: Content[] = [];
+
+                if (options?.title) {
+                    content.push({ text: options.title, style: 'header' });
+                }
+
+                content.push(...this.markdownToContent(text));
+
+                const docDefinition: TDocumentDefinitions = {
+                    content,
+                    defaultStyle: { font: 'Roboto', fontSize: 11, lineHeight: 1.3 },
+                    styles: {
+                        header: { fontSize: 18, bold: true, margin: [0, 0, 0, 16] },
+                        subheader: { fontSize: 14, bold: true, margin: [0, 12, 0, 6] },
+                    },
+                    pageMargins: [40, 60, 40, 60],
+                    footer: (currentPage: number, pageCount: number) => ({
+                        text: `Página ${currentPage} de ${pageCount}`,
+                        alignment: 'center',
+                        fontSize: 8,
+                        margin: [0, 10, 0, 0],
+                    }),
+                };
+
                 const pdfDoc = printer.createPdfKitDocument(docDefinition);
                 const chunks: Buffer[] = [];
 
@@ -139,28 +132,16 @@ export class PdfService {
         return lines.map((line) => {
             const trimmed = line.trim();
 
-            if (trimmed.startsWith('## ')) {
-                return { text: trimmed.replace(/^##\s*/, ''), style: 'subheader' };
-            }
-
-            if (trimmed.startsWith('# ')) {
-                return { text: trimmed.replace(/^#\s*/, ''), style: 'header' };
-            }
+            if (trimmed.startsWith('## ')) return { text: trimmed.replace(/^##\s*/, ''), style: 'subheader' };
+            if (trimmed.startsWith('# ')) return { text: trimmed.replace(/^#\s*/, ''), style: 'header' };
 
             if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-                return {
-                    text: `•  ${this.parseBold(trimmed.replace(/^[-*]\s*/, ''))}`,
-                    margin: [10, 2, 0, 2],
-                } as Content;
+                return { text: `•  ${this.parseBold(trimmed.replace(/^[-*]\s*/, ''))}`, margin: [10, 2, 0, 2] } as Content;
             }
 
-            // Listas numeradas
             const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)/);
             if (numberedMatch) {
-                return {
-                    text: `${numberedMatch[1]}. ${this.parseBold(numberedMatch[2])}`,
-                    margin: [10, 2, 0, 2],
-                } as Content;
+                return { text: `${numberedMatch[1]}. ${this.parseBold(numberedMatch[2])}`, margin: [10, 2, 0, 2] } as Content;
             }
 
             return { text: this.parseBold(trimmed), margin: [0, 2, 0, 2] };
@@ -169,13 +150,10 @@ export class PdfService {
 
     private static parseBold(text: string): any {
         const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
-
         if (parts.length === 1) return text;
 
         return parts.map((part) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-                return { text: part.slice(2, -2), bold: true };
-            }
+            if (part.startsWith('**') && part.endsWith('**')) return { text: part.slice(2, -2), bold: true };
             return { text: part };
         });
     }
