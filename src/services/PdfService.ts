@@ -1,16 +1,13 @@
-import PdfPrinterLib from 'pdfmake';
-// O tipo 'Content' deve ser importado junto com as outras interfaces
+const PdfPrinter = require('pdfmake/src/printer');
+// (Você pode manter o import das interfaces, isso não afeta o runtime)
 import { Content, TDocumentDefinitions } from 'pdfmake/interfaces.js';
 
-// Resolve a incompatibilidade de CommonJS/ESM pegando o .default se ele existir
-const PdfPrinter: any = (PdfPrinterLib as any).default || PdfPrinterLib;
-
 const fonts = {
-    Helvetica: {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique',
+    Roboto: {
+        normal: 'Roboto-Regular.ttf',
+        bold: 'Roboto-Medium.ttf',
+        italics: 'Roboto-Italic.ttf',
+        bolditalics: 'Roboto-MediumItalic.ttf',
     },
 };
 
@@ -84,7 +81,7 @@ export class PdfService {
         const docDefinition: TDocumentDefinitions = {
             content,
             defaultStyle: {
-                font: 'Helvetica',
+                font: 'Roboto',
                 fontSize: 11,
                 lineHeight: 1.3,
             },
