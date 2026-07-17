@@ -3,17 +3,20 @@ import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
 
 const require = createRequire(import.meta.url);
 
-// Bypass Mestre: Carregamos a versão compilada "UMD" (feita para navegador),
-// pois ela já contém todas as dependências embutidas e ignora a bagunça de módulos do Node.js.
 const pdfMakeModule = require('pdfmake/build/pdfmake.js');
 const vfsFontsModule = require('pdfmake/build/vfs_fonts.js');
 
-// Extração à prova de falhas para contornar qualquer empacotamento do Fastify/TypeScript
 const pdfMake = pdfMakeModule.pdfMake || pdfMakeModule.default || pdfMakeModule;
-const vfsFonts = vfsFontsModule.pdfMake?.vfs || vfsFontsModule.vfs || vfsFontsModule;
 
-// Configuramos as fontes embutidas (Virtual File System)
-pdfMake.vfs = vfsFonts;
+// Extração exata e à prova de falhas do VFS
+let vfs = vfsFontsModule.vfs || vfsFontsModule.pdfMake?.vfs;
+// Caso o módulo exporte as fontes diretamente na raiz:
+if (!vfs && vfsFontsModule['Roboto-Regular.ttf']) {
+    vfs = vfsFontsModule;
+}
+
+// Injeta as fontes virtuais no gerador
+pdfMake.vfs = vfs;
 pdfMake.fonts = {
     Roboto: {
         normal: 'Roboto-Regular.ttf',
@@ -81,10 +84,9 @@ export class PdfService {
     static generateFromText(text: string, options?: { title?: string }): Promise<Buffer> {
         return new Promise((resolve, reject) => {
             try {
-                // Trava de segurança para garantir que a extração UMD funcionou
-                if (!pdfMake || typeof pdfMake.createPdf !== 'function') {
-                    console.error(">>> DEBUG UMD EXPORT:", Object.keys(pdfMake));
-                    throw new Error("Falha crítica: pdfMake UMD não possui a função createPdf.");
+                // TRAVA DE SEGURANÇA (Anti-Hang): Se as fontes não estiverem na memória, aborta imediatamente!
+                if (!pdfMake.vfs || !pdfMake.vfs['Roboto-Regular.ttf']) {
+                    return reject(new Error("FALHA CRÍTICA: Fontes VFS ausentes. O gerador foi abortado para evitar processamento infinito."));
                 }
 
                 const content: Content[] = [];
@@ -111,7 +113,6 @@ export class PdfService {
                     }),
                 };
 
-                // Geração direta de buffer usando a API cliente (sem streams e sem construtor)
                 const pdfDocGenerator = pdfMake.createPdf(docDefinition);
                 pdfDocGenerator.getBuffer((buffer: any) => {
                     resolve(buffer as Buffer);
