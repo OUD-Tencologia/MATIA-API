@@ -1,19 +1,19 @@
 import { createRequire } from 'module';
+import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
+
 const require = createRequire(import.meta.url);
 
 // 1. Carrega o arquivo principal de build
 const pdfMakeBuild = require('pdfmake/build/pdfmake.js');
-// 2. Carrega as fontes (importante para evitar erro de fontes faltando)
+// 2. Carrega as fontes
 const vfsFonts = require('pdfmake/build/vfs_fonts.js');
 
-// 3. A classe construtora está dentro da propriedade 'PdfPrinter' do módulo carregado
-const PdfPrinter = pdfMakeBuild.PdfPrinter;
+// 3. A classe construtora (garante que pega o objeto correto)
+const PdfPrinterClass = pdfMakeBuild.PdfPrinter || pdfMakeBuild;
 
-// Se 'PdfPrinter' ainda for undefined, usamos o próprio módulo
-const Constructor = PdfPrinter || pdfMakeBuild;
-PdfPrinter.vfs = vfsFonts.pdfMake?.vfs ?? vfsFonts.vfs ?? {};
+// 4. Extrai o VFS de forma segura, sem tentar modificar a biblioteca
+const vfs = vfsFonts.pdfMake?.vfs ?? vfsFonts.vfs ?? {};
 
-import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
 const fonts = {
     Roboto: {
         normal: 'Roboto-Regular.ttf',
@@ -80,7 +80,8 @@ export class PdfService {
     }
 
     static generateFromText(text: string, options?: { title?: string }): Promise<Buffer> {
-        const printer = new PdfPrinter.PdfPrinter(fonts);
+        // Instancia passando o construtor correto, as fontes e o VFS
+        const printer = new PdfPrinterClass(fonts, vfs);
 
         const content: Content[] = [];
 
