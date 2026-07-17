@@ -112,7 +112,7 @@ await fastify.register(cachePlugin)
 await fastify.register(rateLimitPlugin)
 await fastify.register(multipart, {
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB
+    fileSize: 50 * 1024 * 1024, // 50MB
   }
 })
 

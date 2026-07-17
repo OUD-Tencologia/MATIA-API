@@ -3,6 +3,8 @@ import { UserRepository } from '../repositories/UserRepository.js';
 import { CompanyRepository } from '../repositories/CompanyRepository.js';
 import { LlmConfigRepository } from '../repositories/LlmConfigRepository.js';
 import { ChatRepository } from '../repositories/ChatRepository.js';
+import { MinioService } from '../services/Minioservice.js';
+import { PdfService } from '../services/PdfService.js';
 import { UserNotFoundError, InternalServerError } from '../errors/errors.js';
 import { AskQuestionDTO, ChatResponseDTO } from "../dtos/ChatDTO.js";
 import * as http from "node:http";
@@ -23,22 +25,22 @@ export class ChatService {
             // 2. Validação de Empresa
             if (role !== 'SUPER-ADMIN') {
                 if (!companyId) throw new Error('Usuário não possui uma empresa vinculada para acessar a IA.');
-
                 const company = await CompanyRepository.findById(companyId);
                 if (!company) throw new Error('Empresa vinculada ao usuário não encontrada.');
-
                 const rawCompany = company.get ? company.get({ plain: true }) : company;
                 if (rawCompany.active === false) throw new Error('O acesso desta empresa está suspenso.');
             } else {
-                companyId = null; // Ajustado: para admin não tem company_id atrelado à conversa
+                companyId = null;
             }
 
-            // 3. Buscar a IA Padrão do Banco de Dados
+            // 3. Buscar a IA Padrão
             const config = await LlmConfigRepository.findPadrao();
             if (!config) throw new Error('Nenhuma configuração de Inteligência Artificial ativa foi encontrada no sistema.');
 
-            // 🔥 4. NOVO FLUXO: Salvar a pergunta do usuário no banco ANTES de chamar o RAG
-            // (Assumindo que dto pode ter um conversation_id se for continuação de conversa)
+            // 4. Verificar se é pedido de PDF
+            const isPdf = PdfService.isPdfRequest(dto.question);
+
+            // 5. Salvar a pergunta no banco
             const { conversationId } = await ChatRepository.salvarMensagemTexto(
                 userId,
                 companyId,
@@ -46,7 +48,7 @@ export class ChatService {
                 (dto as any).conversation_id || null
             );
 
-            // 5. Disparar a requisição para o motor RAG em Python
+            // 6. Chamar o RAG
             const pythonResponse = await axios.post('http://host.docker.internal:4001/ask', {
                 question: dto.question,
                 user_id: userId,
@@ -56,7 +58,7 @@ export class ChatService {
                 client_api_key: config.api_key,
                 temperature: config.temperatura,
                 max_tokens: config.max_tokens,
-                chat_history: [], // TODO futuro: buscar histórico do banco se houver conversationId
+                chat_history: [],
                 include_sources: true,
                 response_style: dto.response_style || "equilibrada",
                 jurisdicao: "federal"
@@ -72,14 +74,36 @@ export class ChatService {
 
             const data = pythonResponse.data;
 
-            // 🔥 6. NOVO FLUXO: Salvar a resposta da IA no banco
+            // 7. Salvar resposta da IA no banco
             await ChatRepository.salvarMensagemIA(
                 conversationId,
                 data.answer,
                 config.ia_model
             );
 
-            // 7. Atualizar as estatísticas do perfil no banco
+            // 8. Gerar PDF se solicitado
+            let pdfUrl: string | null = null;
+
+            if (isPdf) {
+                try {
+                    const titulo = PdfService.getTitleFromQuestion(dto.question);
+                    const pdfBuffer = await PdfService.generateFromText(data.answer, { title: titulo });
+                    const fileName = `${titulo.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.pdf`;
+
+                    pdfUrl = await MinioService.uploadPdfBuffer(
+                        pdfBuffer,
+                        fileName,
+                        userId,
+                        companyId
+                    );
+
+                    console.log(`[ChatService] PDF gerado: ${fileName}`);
+                } catch (pdfError: any) {
+                    console.error(`[ChatService] Erro ao gerar PDF:`, pdfError.message);
+                }
+            }
+
+            // 9. Atualizar estatísticas
             try {
                 await UserRepository.updateStats(
                     userId,
@@ -87,16 +111,15 @@ export class ChatService {
                     data.cost?.total?.brl || 0
                 );
             } catch (statsError) {
-                console.error(`[ChatService] Erro ao atualizar estatísticas do usuário ${userId}:`, statsError);
+                console.error(`[ChatService] Erro ao atualizar estatísticas:`, statsError);
             }
 
             return {
                 answer: data.answer,
                 sources: data.sources || [],
                 interaction_id: data.metadata?.interaction_id?.toString() || "gerado-localmente",
-                // 💡 Mandamos o ID da conversa de volta pro Angular saber onde encaixar as próximas mensagens!
                 conversation_id: conversationId,
-
+                pdf_url: pdfUrl,
                 usage: {
                     llm: {
                         total_tokens: data.usage?.llm?.total_tokens || 0,

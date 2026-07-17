@@ -5,7 +5,8 @@ import { CompanyRepository } from '../repositories/CompanyRepository.js'
 import { LlmConfigRepository } from '../repositories/LlmConfigRepository.js'
 import { ChatRepository } from '../repositories/ChatRepository.js'
 import { DocumentRepository } from '../repositories/DocumentRepository.js'
-import { MinioService    } from "../services/Minioservice.js";
+import { MinioService } from "../services/Minioservice.js"
+import { PdfService } from "../services/PdfService.js"
 import { UserNotFoundError, InternalServerError, DocumentNotFoundError } from '../errors/errors.js'
 import type { UploadDocumentDTO, AskDocumentDTO, UploadDocumentResponseDTO, AskDocumentResponseDTO } from '../dtos/DocumentDTO.js'
 import * as http from 'node:http'
@@ -54,9 +55,6 @@ export class DocumentService {
 
     // ─────────────────────────────────────────────
     // 1. UPLOAD DE DOCUMENTO
-    // 1a. Salva no MinIO
-    // 1b. Envia ao RAG para indexação
-    // 1c. Salva referências no banco
     // ─────────────────────────────────────────────
     static async uploadDocumento(
         fileBuffer: Buffer,
@@ -67,7 +65,6 @@ export class DocumentService {
         userId: string
     ): Promise<UploadDocumentResponseDTO> {
         try {
-            // 1. Validar usuário
             const user = await UserRepository.findByIdForAuth(userId)
             if (!user) throw new UserNotFoundError(userId)
 
@@ -75,7 +72,6 @@ export class DocumentService {
             const role = rawUser.role
             let companyId = rawUser.empresa_id
 
-            // 2. Validar empresa
             if (role !== 'SUPER-ADMIN') {
                 if (!companyId) throw new Error('Usuário não possui uma empresa vinculada.')
                 const company = await CompanyRepository.findById(companyId)
@@ -86,11 +82,9 @@ export class DocumentService {
                 companyId = null
             }
 
-            // 3. Salvar no MinIO
             const minioPath = await MinioService.uploadBuffer(fileBuffer, originalName, mimeType, userId, companyId)
             console.log(`[DocumentService] Arquivo salvo no MinIO: ${minioPath}`)
 
-            // 4. Enviar ao RAG para indexação
             const form = new FormData()
             form.append('file', fileBuffer, { filename: originalName, contentType: mimeType })
             form.append('company_id', companyId || 'matia-super-admin')
@@ -109,7 +103,6 @@ export class DocumentService {
             const ragData = ragResponse.data
             const ragDocumentId: string = ragData.document_id
 
-            // 5. Salvar no banco com o caminho do MinIO como storage_path
             const { documentoId, conversationId } = await DocumentRepository.salvarDocumento(
                 userId,
                 companyId,
@@ -118,7 +111,7 @@ export class DocumentService {
                 mimeType,
                 fileSize,
                 dto.conversation_id || null,
-                minioPath // passa o caminho do MinIO
+                minioPath
             )
 
             console.log(`[DocumentService] Documento indexado. RAG ID: ${ragDocumentId}, MinIO: ${minioPath}, Conversa: ${conversationId}`)
@@ -161,7 +154,6 @@ export class DocumentService {
         userId: string
     ): Promise<AskDocumentResponseDTO> {
         try {
-            // 1. Validar usuário
             const user = await UserRepository.findByIdForAuth(userId)
             if (!user) throw new UserNotFoundError(userId)
 
@@ -169,7 +161,6 @@ export class DocumentService {
             const role = rawUser.role
             let companyId = rawUser.empresa_id
 
-            // 2. Validar empresa
             if (role !== 'SUPER-ADMIN') {
                 if (!companyId) throw new Error('Usuário não possui uma empresa vinculada.')
                 const company = await CompanyRepository.findById(companyId)
@@ -180,11 +171,9 @@ export class DocumentService {
                 companyId = null
             }
 
-            // 3. Buscar configuração de IA
             const config = await LlmConfigRepository.findPadrao()
             if (!config) throw new Error('Nenhuma configuração de IA ativa encontrada.')
 
-            // 4. Buscar rag_document_ids validando ownership
             const ragDocumentIds = await DocumentRepository.buscarRagDocumentIdsPorConversa(dto.conversation_id, userId)
 
             if (ragDocumentIds === null) {
@@ -195,10 +184,11 @@ export class DocumentService {
                 throw new Error('Nenhum documento encontrado nesta conversa para responder a pergunta.')
             }
 
-            // 5. Salvar pergunta no banco
+            // Verificar se é pedido de PDF
+            const isPdf = PdfService.isPdfRequest(dto.question)
+
             await ChatRepository.salvarMensagemTexto(userId, companyId, dto.question, dto.conversation_id)
 
-            // 6. Chamar o RAG
             const ragResponse = await axios.post(`${RAG_BASE_URL}/documents/ask`, {
                 question: dto.question,
                 company_id: companyId || 'matia-super-admin',
@@ -220,10 +210,30 @@ export class DocumentService {
 
             const data = ragResponse.data
 
-            // 7. Salvar resposta da IA
             await ChatRepository.salvarMensagemIA(dto.conversation_id, data.answer, config.ia_model)
 
-            // 8. Atualizar estatísticas
+            // Gerar PDF se solicitado
+            let pdfUrl: string | null = null
+
+            if (isPdf) {
+                try {
+                    const titulo = PdfService.getTitleFromQuestion(dto.question)
+                    const pdfBuffer = await PdfService.generateFromText(data.answer, { title: titulo })
+                    const fileName = `${titulo.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.pdf`
+
+                    pdfUrl = await MinioService.uploadPdfBuffer(
+                        pdfBuffer,
+                        fileName,
+                        userId,
+                        companyId
+                    )
+
+                    console.log(`[DocumentService] PDF gerado: ${fileName}`)
+                } catch (pdfError: any) {
+                    console.error(`[DocumentService] Erro ao gerar PDF:`, pdfError.message)
+                }
+            }
+
             try {
                 await UserRepository.updateStats(
                     userId,
@@ -241,6 +251,7 @@ export class DocumentService {
                 confidence: data.confidence,
                 validation_status: data.validation_status,
                 risk_level: data.risk_level,
+                pdf_url: pdfUrl,
                 usage: {
                     llm: {
                         total_tokens: data.metadata?.usage?.llm?.total_tokens || 0,

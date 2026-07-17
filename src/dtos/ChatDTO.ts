@@ -25,6 +25,7 @@ export interface ChatResponseDTO {
     confidence?: number;
     risk_level?: string;
     validation_status?: string;
+    pdf_url?: string | null;
 
 
     usage?: {

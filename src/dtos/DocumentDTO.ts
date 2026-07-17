@@ -47,6 +47,7 @@ export interface AskDocumentResponseDTO {
     confidence: number;
     validation_status: string;
     risk_level: string;
+    pdf_url?: string | null;
     usage: {
         llm: {
             total_tokens: number;
