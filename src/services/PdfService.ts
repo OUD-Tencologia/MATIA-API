@@ -60,7 +60,6 @@ export class PdfService {
     static async generateFromText(text: string, options?: { title?: string }): Promise<Buffer> {
         return new Promise((resolve, reject) => {
             try {
-                // Habilitamos bufferPages para calcular o total de páginas no rodapé dinamicamente
                 const doc = new PDFDocument({
                     margin: 55,
                     size: 'A4',
@@ -72,14 +71,15 @@ export class PdfService {
                 doc.on('end', () => resolve(Buffer.concat(chunks)));
                 doc.on('error', reject);
 
-                // Paleta de Cores Profissional/Acadêmica
-                const primaryColor = '#1A365D'; // Azul Marinho Profundo
-                const textColor = '#2D3748';    // Grafite Escuro para leitura confortável
-                const lightGrey = '#E2E8F0';    // Linhas divisórias sutis
+                // Espaçamento estável entre linhas
+                doc.lineGap(3);
+
+                const primaryColor = '#1A365D';
+                const textColor = '#2D3748';
+                const lightGrey = '#E2E8F0';
 
                 doc.fillColor(textColor);
 
-                // Título Principal Centralizado
                 if (options?.title) {
                     doc.font('Helvetica-Bold')
                         .fontSize(20)
@@ -97,7 +97,6 @@ export class PdfService {
                         continue;
                     }
 
-                    // 1. Linha Divisória (---)
                     if (trimmed === '---') {
                         doc.moveDown(0.2);
                         doc.moveTo(doc.page.margins.left, doc.y)
@@ -109,7 +108,6 @@ export class PdfService {
                         continue;
                     }
 
-                    // 2. Cabeçalhos (#, ##, ###, ####)
                     if (line.startsWith('# ')) {
                         const content = line.replace('# ', '');
                         doc.font('Helvetica-Bold').fontSize(16).fillColor(primaryColor).text(content);
@@ -135,38 +133,45 @@ export class PdfService {
                         continue;
                     }
 
-                    // 3. Listas com Marcadores (- ou *)
                     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
                         const content = trimmed.replace(/^[-*]\s+/, '');
                         doc.font('Helvetica').fontSize(10.5).fillColor(textColor);
 
-                        // Desenha o marcador sutil e continua o texto alinhado
                         doc.text('  •  ', { continued: true });
                         this.renderInlineFormatting(doc, content);
                         doc.moveDown(0.3);
                         continue;
                     }
 
-                    // 4. Parágrafos de Texto Comum
-                    doc.font('Helvetica').fontSize(10.5).fillColor(textColor).configuration = { lineGap: 3 };
+                    doc.font('Helvetica').fontSize(10.5).fillColor(textColor);
                     this.renderInlineFormatting(doc, trimmed);
                     doc.moveDown(0.4);
                 }
 
-                // Criação do Rodapé Automático Avançado (Página X de Y)
+                // ─────────────────────────────────────────────────────────────
+                // CORREÇÃO DOS RODAPÉS (FIM DAS PÁGINAS FANTASMAS)
+                // ─────────────────────────────────────────────────────────────
                 const range = doc.bufferedPageRange();
                 for (let i = range.start; i < range.start + range.count; i++) {
                     doc.switchToPage(i);
+
+                    // Salvamos a margem antiga e zeramos para ignorar auto-breaks de rodapé
+                    const oldBottomMargin = doc.page.margins.bottom;
+                    doc.page.margins.bottom = 0;
+
                     doc.font('Helvetica').fontSize(8.5).fillColor('#718096');
                     doc.text(
                         `Página ${i + 1} de ${range.count}`,
                         doc.page.margins.left,
-                        doc.page.height - 40,
+                        doc.page.height - 35, // Escreve com segurança na margem física inferior
                         {
                             align: 'center',
                             width: doc.page.width - doc.page.margins.left - doc.page.margins.right
                         }
                     );
+
+                    // Restauramos a margem original para manter o documento íntegro
+                    doc.page.margins.bottom = oldBottomMargin;
                 }
 
                 doc.end();
@@ -176,11 +181,8 @@ export class PdfService {
         });
     }
 
-    /**
-     * Interpola o texto para renderizar trechos em **negrito** misturados no parágrafo
-     */
     private static renderInlineFormatting(doc: any, text: string) {
-        const parts = text.split(/(\*\*[^*]+\*\*)/g);
+        const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
 
         for (let i = 0; i < parts.length; i++) {
             const part = parts[i];
