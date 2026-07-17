@@ -1,6 +1,8 @@
-import PdfPrinterLib from 'pdfmake';
-import {TDocumentDefinitions, Content} from "pdfmake/interfaces.js";
-const PdfPrinter: any = PdfPrinterLib;
+// @ts-ignore
+import PdfPrinter from 'pdfmake/js/Printer';
+// @ts-ignore
+import { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
+
 const fonts = {
     Roboto: {
         normal: 'Roboto-Regular.ttf',
