@@ -1,10 +1,5 @@
-import * as PdfMake from 'pdfmake';
-import {TDocumentDefinitions} from "pdfmake/interfaces.js";
-import {Content} from "pdfmake";
-
-// No pdfmake atual, o construtor geralmente é o export padrão ou o próprio objeto
-const PdfPrinter = (PdfMake as any).default || PdfMake;
-
+import PdfPrinter from 'pdfmake';
+import {TDocumentDefinitions, Content} from "pdfmake/interfaces.js";
 const fonts = {
     Roboto: {
         normal: 'Roboto-Regular.ttf',
