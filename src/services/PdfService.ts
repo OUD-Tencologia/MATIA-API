@@ -3,25 +3,19 @@ import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
 
 const require = createRequire(import.meta.url);
 
-// 1. Busca cirúrgica pela classe PdfPrinter direto no arquivo compilado da biblioteca
-let PdfPrinterClass: any;
-try {
-    PdfPrinterClass = require('pdfmake/js/printer.js');
-    if (PdfPrinterClass.default) PdfPrinterClass = PdfPrinterClass.default;
-} catch (err) {
-    const raw = require('pdfmake');
-    PdfPrinterClass = typeof raw === 'function' ? raw : (raw.default || raw.PdfPrinter || raw);
-}
+const pdfMakeModule = require('pdfmake/build/pdfmake.js');
+const vfsFontsModule = require('pdfmake/build/vfs_fonts.js');
 
-// 2. Uso de Fontes Padrões do PDF (Nativas)
-// IMPORTANTE: Ao usar "Helvetica", a biblioteca não tenta ler nenhum arquivo .ttf do HD ou Memória.
-// Isso elimina 100% dos travamentos (hangs) e erros de "arquivo não encontrado" (ENOENT).
-const fonts = {
-    Helvetica: {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique',
+const pdfMake = pdfMakeModule.pdfMake || pdfMakeModule.default || pdfMakeModule;
+const vfs = vfsFontsModule.vfs || vfsFontsModule.pdfMake?.vfs || vfsFontsModule;
+
+pdfMake.vfs = vfs;
+pdfMake.fonts = {
+    Roboto: {
+        normal: 'Roboto-Regular.ttf',
+        bold: 'Roboto-Medium.ttf',
+        italics: 'Roboto-Italic.ttf',
+        bolditalics: 'Roboto-MediumItalic.ttf',
     }
 };
 
@@ -80,50 +74,42 @@ export class PdfService {
         return 'Documento Jurídico';
     }
 
-    static generateFromText(text: string, options?: { title?: string }): Promise<Buffer> {
-        return new Promise((resolve, reject) => {
+    static async generateFromText(text: string, options?: { title?: string }): Promise<Buffer> {
+        const content: Content[] = [];
+
+        if (options?.title) {
+            content.push({ text: options.title, style: 'header' });
+        }
+
+        content.push(...this.markdownToContent(text));
+
+        const docDefinition: TDocumentDefinitions = {
+            content,
+            defaultStyle: { font: 'Roboto', fontSize: 11, lineHeight: 1.3 },
+            styles: {
+                header: { fontSize: 18, bold: true, margin: [0, 0, 0, 16] },
+                subheader: { fontSize: 14, bold: true, margin: [0, 12, 0, 6] },
+            },
+            pageMargins: [40, 60, 40, 60],
+            footer: (currentPage: number, pageCount: number) => ({
+                text: `Página ${currentPage} de ${pageCount}`,
+                alignment: 'center',
+                fontSize: 8,
+                margin: [0, 10, 0, 0],
+            }),
+        };
+
+        const pdfDocGenerator = pdfMake.createPdf(docDefinition);
+
+        return await new Promise<Buffer>((resolve, reject) => {
             try {
-                if (typeof PdfPrinterClass !== 'function') {
-                    return reject(new Error(`Falha Crítica: Construtor pdfmake não é uma função. Tipo: ${typeof PdfPrinterClass}`));
+                const result = pdfDocGenerator.getBuffer((buffer: any) => {
+                    if (buffer) resolve(buffer as Buffer);
+                });
+
+                if (result instanceof Promise) {
+                    result.then((buffer: any) => resolve(buffer as Buffer)).catch(reject);
                 }
-
-                // Instancia o gerador Node.js puro com as fontes nativas
-                const printer = new PdfPrinterClass(fonts);
-                const content: Content[] = [];
-
-                if (options?.title) {
-                    content.push({ text: options.title, style: 'header' });
-                }
-
-                content.push(...this.markdownToContent(text));
-
-                const docDefinition: TDocumentDefinitions = {
-                    content,
-                    // Garante que o documento use a fonte nativa Helvetica
-                    defaultStyle: { font: 'Helvetica', fontSize: 11, lineHeight: 1.3 },
-                    styles: {
-                        header: { fontSize: 18, bold: true, margin: [0, 0, 0, 16] },
-                        subheader: { fontSize: 14, bold: true, margin: [0, 12, 0, 6] },
-                    },
-                    pageMargins: [40, 60, 40, 60],
-                    footer: (currentPage: number, pageCount: number) => ({
-                        text: `Página ${currentPage} de ${pageCount}`,
-                        alignment: 'center',
-                        fontSize: 8,
-                        margin: [0, 10, 0, 0],
-                    }),
-                };
-
-                // Uso de Streams padrão do Node.js (Sem Promessas zumbis)
-                const pdfDoc = printer.createPdfKitDocument(docDefinition);
-                const chunks: Buffer[] = [];
-
-                pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
-                pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-                pdfDoc.on('error', (err: Error) => reject(err));
-
-                pdfDoc.end(); // Libera o documento e finaliza o stream
-
             } catch (err) {
                 reject(err);
             }
