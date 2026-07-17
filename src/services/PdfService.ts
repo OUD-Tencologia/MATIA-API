@@ -3,26 +3,25 @@ import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
 
 const require = createRequire(import.meta.url);
 
-const pdfMakeModule = require('pdfmake/build/pdfmake.js');
-const vfsFontsModule = require('pdfmake/build/vfs_fonts.js');
-
-const pdfMake = pdfMakeModule.pdfMake || pdfMakeModule.default || pdfMakeModule;
-
-// Extração exata e à prova de falhas do VFS
-let vfs = vfsFontsModule.vfs || vfsFontsModule.pdfMake?.vfs;
-// Caso o módulo exporte as fontes diretamente na raiz:
-if (!vfs && vfsFontsModule['Roboto-Regular.ttf']) {
-    vfs = vfsFontsModule;
+// 1. Busca cirúrgica pela classe PdfPrinter direto no arquivo compilado da biblioteca
+let PdfPrinterClass: any;
+try {
+    PdfPrinterClass = require('pdfmake/js/printer.js');
+    if (PdfPrinterClass.default) PdfPrinterClass = PdfPrinterClass.default;
+} catch (err) {
+    const raw = require('pdfmake');
+    PdfPrinterClass = typeof raw === 'function' ? raw : (raw.default || raw.PdfPrinter || raw);
 }
 
-// Injeta as fontes virtuais no gerador
-pdfMake.vfs = vfs;
-pdfMake.fonts = {
-    Roboto: {
-        normal: 'Roboto-Regular.ttf',
-        bold: 'Roboto-Medium.ttf',
-        italics: 'Roboto-Italic.ttf',
-        bolditalics: 'Roboto-MediumItalic.ttf',
+// 2. Uso de Fontes Padrões do PDF (Nativas)
+// IMPORTANTE: Ao usar "Helvetica", a biblioteca não tenta ler nenhum arquivo .ttf do HD ou Memória.
+// Isso elimina 100% dos travamentos (hangs) e erros de "arquivo não encontrado" (ENOENT).
+const fonts = {
+    Helvetica: {
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique',
     }
 };
 
@@ -84,11 +83,12 @@ export class PdfService {
     static generateFromText(text: string, options?: { title?: string }): Promise<Buffer> {
         return new Promise((resolve, reject) => {
             try {
-                // TRAVA DE SEGURANÇA (Anti-Hang): Se as fontes não estiverem na memória, aborta imediatamente!
-                if (!pdfMake.vfs || !pdfMake.vfs['Roboto-Regular.ttf']) {
-                    return reject(new Error("FALHA CRÍTICA: Fontes VFS ausentes. O gerador foi abortado para evitar processamento infinito."));
+                if (typeof PdfPrinterClass !== 'function') {
+                    return reject(new Error(`Falha Crítica: Construtor pdfmake não é uma função. Tipo: ${typeof PdfPrinterClass}`));
                 }
 
+                // Instancia o gerador Node.js puro com as fontes nativas
+                const printer = new PdfPrinterClass(fonts);
                 const content: Content[] = [];
 
                 if (options?.title) {
@@ -99,7 +99,8 @@ export class PdfService {
 
                 const docDefinition: TDocumentDefinitions = {
                     content,
-                    defaultStyle: { font: 'Roboto', fontSize: 11, lineHeight: 1.3 },
+                    // Garante que o documento use a fonte nativa Helvetica
+                    defaultStyle: { font: 'Helvetica', fontSize: 11, lineHeight: 1.3 },
                     styles: {
                         header: { fontSize: 18, bold: true, margin: [0, 0, 0, 16] },
                         subheader: { fontSize: 14, bold: true, margin: [0, 12, 0, 6] },
@@ -113,10 +114,15 @@ export class PdfService {
                     }),
                 };
 
-                const pdfDocGenerator = pdfMake.createPdf(docDefinition);
-                pdfDocGenerator.getBuffer((buffer: any) => {
-                    resolve(buffer as Buffer);
-                });
+                // Uso de Streams padrão do Node.js (Sem Promessas zumbis)
+                const pdfDoc = printer.createPdfKitDocument(docDefinition);
+                const chunks: Buffer[] = [];
+
+                pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
+                pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+                pdfDoc.on('error', (err: Error) => reject(err));
+
+                pdfDoc.end(); // Libera o documento e finaliza o stream
 
             } catch (err) {
                 reject(err);
