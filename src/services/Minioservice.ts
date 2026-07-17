@@ -2,8 +2,18 @@ import * as Minio from 'minio'
 import { randomUUID } from 'crypto'
 import path from 'path'
 
+// Cliente Interno: Usado para salvar/deletar arquivos na rede interna do Docker
 const minioClient = new Minio.Client({
     endPoint: process.env.MINIO_ENDPOINT || 'minio',
+    port: parseInt(process.env.MINIO_PORT || '9000'),
+    useSSL: process.env.MINIO_USE_SSL === 'true',
+    accessKey: process.env.MINIO_ROOT_USER || 'admin',
+    secretKey: process.env.MINIO_ROOT_PASSWORD || 'admin123456',
+})
+
+// Cliente Público: Usado EXCLUSIVAMENTE para gerar assinaturas criptográficas (URLs) válidas para o navegador externo
+const publicMinioClient = new Minio.Client({
+    endPoint: '192.168.17.22', // O IP real da VPS que o navegador usa
     port: parseInt(process.env.MINIO_PORT || '9000'),
     useSSL: process.env.MINIO_USE_SSL === 'true',
     accessKey: process.env.MINIO_ROOT_USER || 'admin',
@@ -67,15 +77,14 @@ export class MinioService {
 
         console.log(`[MinioService] PDF salvo: ${objectName}`)
 
-        // Utiliza o método corrigido para retornar a URL acessível pelo navegador externo
+        // Utiliza o método de URL temporária correta
         return await this.gerarUrlTemporaria(objectName, 3600)
     }
 
     static async gerarUrlTemporaria(objectName: string, expiracaoSegundos: number = 3600): Promise<string> {
-        const url = await minioClient.presignedGetObject(BUCKET, objectName, expiracaoSegundos)
-
-        // Corrige o host interno do Docker para o IP público da VPS acessível de fora
-        return url.replace('minio:9000', '192.168.17.22:9000')
+        // MÁGICA AQUI: Usando o publicMinioClient, o SDK gera a assinatura matemática perfeita
+        // baseada no IP da VPS, fazendo com que o MinIO aceite o download sem dar erro de Signature Mismatch!
+        return await publicMinioClient.presignedGetObject(BUCKET, objectName, expiracaoSegundos)
     }
 
     static async deletar(objectName: string): Promise<void> {
