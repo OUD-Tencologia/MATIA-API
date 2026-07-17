@@ -1,6 +1,9 @@
-const PdfPrinter = require('pdfmake/src/printer');
-// (Você pode manter o import das interfaces, isso não afeta o runtime)
-import { Content, TDocumentDefinitions } from 'pdfmake/interfaces.js';
+import * as PdfMake from 'pdfmake';
+import {TDocumentDefinitions} from "pdfmake/interfaces.js";
+import {Content} from "pdfmake";
+
+// No pdfmake atual, o construtor geralmente é o export padrão ou o próprio objeto
+const PdfPrinter = (PdfMake as any).default || PdfMake;
 
 const fonts = {
     Roboto: {
