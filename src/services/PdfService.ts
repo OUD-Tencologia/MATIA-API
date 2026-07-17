@@ -3,17 +3,11 @@ import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
 
 const require = createRequire(import.meta.url);
 
-// 1. Carrega o arquivo principal de build
-const pdfMakeBuild = require('pdfmake/build/pdfmake.js');
-// 2. Carrega as fontes
-const vfsFonts = require('pdfmake/build/vfs_fonts.js');
+// 1. Carrega a versão pura de servidor (sem acessar a pasta /build/)
+const PdfPrinter = require('pdfmake');
 
-// 3. A classe construtora (garante que pega o objeto correto)
-const PdfPrinterClass = pdfMakeBuild.PdfPrinter || pdfMakeBuild;
-
-// 4. Extrai o VFS de forma segura, sem tentar modificar a biblioteca
-const vfs = vfsFonts.pdfMake?.vfs ?? vfsFonts.vfs ?? {};
-
+// 2. No servidor, as fontes são lidas do disco.
+// Certifique-se de que esses arquivos .ttf estejam na raiz do seu projeto (ou ajuste o caminho).
 const fonts = {
     Roboto: {
         normal: 'Roboto-Regular.ttf',
@@ -80,8 +74,8 @@ export class PdfService {
     }
 
     static generateFromText(text: string, options?: { title?: string }): Promise<Buffer> {
-        // Instancia passando o construtor correto, as fontes e o VFS
-        const printer = new PdfPrinterClass(fonts, vfs);
+        // No Node.js, apenas instanciamos passando o caminho das fontes físicas
+        const printer = new PdfPrinter(fonts);
 
         const content: Content[] = [];
 
