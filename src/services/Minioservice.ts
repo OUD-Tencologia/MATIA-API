@@ -67,13 +67,15 @@ export class MinioService {
 
         console.log(`[MinioService] PDF salvo: ${objectName}`)
 
-        // Retorna URL pré-assinada válida por 1 hora
-        const url = await minioClient.presignedGetObject(BUCKET, objectName, 3600)
-        return url
+        // Utiliza o método corrigido para retornar a URL acessível pelo navegador externo
+        return await this.gerarUrlTemporaria(objectName, 3600)
     }
 
     static async gerarUrlTemporaria(objectName: string, expiracaoSegundos: number = 3600): Promise<string> {
-        return await minioClient.presignedGetObject(BUCKET, objectName, expiracaoSegundos)
+        const url = await minioClient.presignedGetObject(BUCKET, objectName, expiracaoSegundos)
+
+        // Corrige o host interno do Docker para o IP público da VPS acessível de fora
+        return url.replace('minio:9000', '192.168.17.22:9000')
     }
 
     static async deletar(objectName: string): Promise<void> {
