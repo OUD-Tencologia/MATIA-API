@@ -3,23 +3,24 @@ import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
 
 const require = createRequire(import.meta.url);
 
-// Bypass definitivo: Acessamos o arquivo original da classe dentro do pacote
-// Isso evita qualquer problema de empacotamento ESM/CommonJS que o Node está causando
-let PdfPrinterClass: any;
-try {
-    PdfPrinterClass = require('pdfmake/src/printer.js');
-} catch (e) {
-    const raw = require('pdfmake');
-    PdfPrinterClass = typeof raw === 'function' ? raw : (raw.default || raw.PdfPrinter || raw);
-}
+// Bypass Mestre: Carregamos a versão compilada "UMD" (feita para navegador),
+// pois ela já contém todas as dependências embutidas e ignora a bagunça de módulos do Node.js.
+const pdfMakeModule = require('pdfmake/build/pdfmake.js');
+const vfsFontsModule = require('pdfmake/build/vfs_fonts.js');
 
-const fonts = {
+// Extração à prova de falhas para contornar qualquer empacotamento do Fastify/TypeScript
+const pdfMake = pdfMakeModule.pdfMake || pdfMakeModule.default || pdfMakeModule;
+const vfsFonts = vfsFontsModule.pdfMake?.vfs || vfsFontsModule.vfs || vfsFontsModule;
+
+// Configuramos as fontes embutidas (Virtual File System)
+pdfMake.vfs = vfsFonts;
+pdfMake.fonts = {
     Roboto: {
         normal: 'Roboto-Regular.ttf',
         bold: 'Roboto-Medium.ttf',
         italics: 'Roboto-Italic.ttf',
         bolditalics: 'Roboto-MediumItalic.ttf',
-    },
+    }
 };
 
 export class PdfService {
@@ -80,14 +81,12 @@ export class PdfService {
     static generateFromText(text: string, options?: { title?: string }): Promise<Buffer> {
         return new Promise((resolve, reject) => {
             try {
-                // Trava de segurança: Se falhar, cospe a estrutura real no terminal
-                if (typeof PdfPrinterClass !== 'function') {
-                    console.error(">>> DEBUG CRÍTICO: O pacote pdfmake não exportou a função construtora.");
-                    console.error(">>> ESTRUTURA RECEBIDA:", Object.keys(PdfPrinterClass));
-                    throw new Error(`PdfPrinterClass falhou. Tipo lido: ${typeof PdfPrinterClass}`);
+                // Trava de segurança para garantir que a extração UMD funcionou
+                if (!pdfMake || typeof pdfMake.createPdf !== 'function') {
+                    console.error(">>> DEBUG UMD EXPORT:", Object.keys(pdfMake));
+                    throw new Error("Falha crítica: pdfMake UMD não possui a função createPdf.");
                 }
 
-                const printer = new PdfPrinterClass(fonts);
                 const content: Content[] = [];
 
                 if (options?.title) {
@@ -112,14 +111,12 @@ export class PdfService {
                     }),
                 };
 
-                const pdfDoc = printer.createPdfKitDocument(docDefinition);
-                const chunks: Buffer[] = [];
+                // Geração direta de buffer usando a API cliente (sem streams e sem construtor)
+                const pdfDocGenerator = pdfMake.createPdf(docDefinition);
+                pdfDocGenerator.getBuffer((buffer: any) => {
+                    resolve(buffer as Buffer);
+                });
 
-                pdfDoc.on('data', (chunk: Buffer) => chunks.push(chunk));
-                pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
-                pdfDoc.on('error', (err: Error) => reject(err));
-
-                pdfDoc.end();
             } catch (err) {
                 reject(err);
             }
