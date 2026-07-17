@@ -4,12 +4,16 @@ import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
 const require = createRequire(import.meta.url);
 
 const pdfMakeModule = require('pdfmake/build/pdfmake.js');
+// Importante: Usamos o arquivo de fontes para evitar que ele tente baixar via rede
 const vfsFontsModule = require('pdfmake/build/vfs_fonts.js');
 
 const pdfMake = pdfMakeModule.pdfMake || pdfMakeModule.default || pdfMakeModule;
 const vfs = vfsFontsModule.vfs || vfsFontsModule.pdfMake?.vfs || vfsFontsModule;
 
 pdfMake.vfs = vfs;
+
+// Configuração crucial: Usar a fonte base "Roboto" padrão do pacote vfs_fonts
+// Evite usar Helvetica aqui se o pacote vfs não tiver os dados da Helvetica configurados.
 pdfMake.fonts = {
     Roboto: {
         normal: 'Roboto-Regular.ttf',
@@ -103,13 +107,14 @@ export class PdfService {
 
         return await new Promise<Buffer>((resolve, reject) => {
             try {
-                const result = pdfDocGenerator.getBuffer((buffer: any) => {
-                    if (buffer) resolve(buffer as Buffer);
+                // Nova abordagem para garantir que recebemos o buffer corretamente
+                pdfDocGenerator.getBuffer((buffer: any) => {
+                    if (buffer) {
+                        resolve(buffer as Buffer);
+                    } else {
+                        reject(new Error("Erro: O buffer retornado pelo pdfmake estava vazio."));
+                    }
                 });
-
-                if (result instanceof Promise) {
-                    result.then((buffer: any) => resolve(buffer as Buffer)).catch(reject);
-                }
             } catch (err) {
                 reject(err);
             }
