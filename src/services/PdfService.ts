@@ -2,12 +2,16 @@ import { createRequire } from 'module';
 import { TDocumentDefinitions, Content } from "pdfmake/interfaces.js";
 
 const require = createRequire(import.meta.url);
+const pdfMakeRaw = require('pdfmake');
 
-// 1. Carrega a versão pura de servidor (sem acessar a pasta /build/)
-const PdfPrinter = require('pdfmake');
+// Extração segura do construtor: verifica todas as formas possíveis que o Node pode exportar
+const PdfPrinterClass = typeof pdfMakeRaw === 'function'
+    ? pdfMakeRaw
+    : (pdfMakeRaw.default || pdfMakeRaw.PdfPrinter || pdfMakeRaw.Printer);
 
-// 2. No servidor, as fontes são lidas do disco.
-// Certifique-se de que esses arquivos .ttf estejam na raiz do seu projeto (ou ajuste o caminho).
+// Importante: No ambiente de servidor (Docker), o caminho das fontes precisa
+// apontar fisicamente para onde os arquivos .ttf estão no contêiner.
+// Se ocorrer erro "ENOENT" no próximo log, coloque o caminho absoluto (ex: '/app/fonts/Roboto-Regular.ttf')
 const fonts = {
     Roboto: {
         normal: 'Roboto-Regular.ttf',
@@ -75,7 +79,7 @@ export class PdfService {
 
     static generateFromText(text: string, options?: { title?: string }): Promise<Buffer> {
         // No Node.js, apenas instanciamos passando o caminho das fontes físicas
-        const printer = new PdfPrinter(fonts);
+        const printer = new PdfPrinterClass(fonts);
 
         const content: Content[] = [];
 
