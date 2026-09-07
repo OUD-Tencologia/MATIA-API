@@ -13,7 +13,7 @@ const minioClient = new Minio.Client({
 
 // Cliente Público: Usado EXCLUSIVAMENTE para gerar assinaturas criptográficas (URLs) válidas para o navegador externo
 const publicMinioClient = new Minio.Client({
-    endPoint: '192.168.17.22', // O IP real da VPS que o navegador usa
+    endPoint: '192.168.17.16', // O IP real da VPS que o navegador usa
     port: parseInt(process.env.MINIO_PORT || '9000'),
     useSSL: process.env.MINIO_USE_SSL === 'true',
     accessKey: process.env.MINIO_ROOT_USER || 'admin',
