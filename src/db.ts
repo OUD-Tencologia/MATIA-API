@@ -16,11 +16,12 @@ let sequelize: Sequelize
 if (process.env.NODE_ENV === 'test') {
     sequelize = new Sequelize('sqlite::memory:', {
         logging: false,
-    })
-
-    // Disable foreign key constraints for SQLite tests
-    sequelize.addHook('afterConnect', async (connection: any) => {
-        await connection.query('PRAGMA foreign_keys = OFF')
+        // Disable foreign key constraints for SQLite tests.
+        // NOTE: an `afterConnect` hook was used here before, but Sequelize's sqlite
+        // ConnectionManager overrides `getConnection()` and never runs connection hooks,
+        // so `PRAGMA foreign_keys = OFF` was silently never applied. `foreignKeys: false`
+        // is the dialect option the sqlite ConnectionManager actually reads.
+        foreignKeys: false,
     })
 } else {
     // Verifica se as variáveis de ambiente estão definidas
