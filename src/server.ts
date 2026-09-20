@@ -33,6 +33,7 @@ import chatMatiaRoutes from './routes/chatMatiaRoutes.js';
 import companyRoutes from './routes/companyRoutes.js'
 import profileRoutes from './routes/profileRoutes.js'
 import userActivityLogsRoutes from './routes/user_activity_logRoutes.js'
+import userRoleRoutes from './routes/user_roleRoutes.js'
 import {
   errorHandler,
   setupGlobalErrorHandlers,
@@ -195,6 +196,7 @@ await fastify.register(documentsTagsRelationsRoutes, { prefix: '/api/documents_t
 await fastify.register(documentsAnalysesRoutes, { prefix: '/api/documents_analyses' })
 await fastify.register(activityLogsRoutes, { prefix: '/api/activity_logs' })
 await fastify.register(userActivityLogsRoutes, { prefix: '/api/user_activity_log' })
+await fastify.register(userRoleRoutes, { prefix: '/api/user_roles' })
 
 await fastify.register(swaggerUi, {
   routePrefix: '/docs',

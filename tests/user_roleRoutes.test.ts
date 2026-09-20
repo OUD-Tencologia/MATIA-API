@@ -37,7 +37,7 @@ describe('UserRoleRoutes', () => {
 
     await app.ready()
 
-    testToken = app.jwt.sign({ user_id: 'test-user-id', user_role: 'admin' })
+    testToken = app.jwt.sign({ id: 'test-user-id', role: 'ADMIN', empresa_id: null })
 
     const profileReq = {
       body: {
@@ -64,7 +64,7 @@ describe('UserRoleRoutes', () => {
     it('Deve criar um userRole com sucesso', async () => {
       const userRole = {
         user_id: profileID,
-        role: 'admin',
+        role: 'ADMIN',
       }
 
       const response = await app.inject({
@@ -77,8 +77,6 @@ describe('UserRoleRoutes', () => {
       })
 
       const body = JSON.parse(response.body)
-
-      console.log(response)
 
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
@@ -117,7 +115,7 @@ describe('UserRoleRoutes', () => {
   })
   describe('PUT /user-role', () => {
     it('Deve atualizar o UserRole com sucesso', async () => {
-      const novaAcao = 'publico'
+      const novaAcao = 'USER'
 
       const response = await app.inject({
         method: 'PUT',
@@ -138,7 +136,7 @@ describe('UserRoleRoutes', () => {
     })
 
     it('Deve retornar erro 401 ao tentar atualizar sem o token', async () => {
-      const novaAcao2 = 'publico'
+      const novaAcao2 = 'USER'
 
       const response = await app.inject({
         method: 'PUT',

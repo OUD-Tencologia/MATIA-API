@@ -40,14 +40,14 @@ describe('UserRoleController', () => {
       const req = {
         body: {
           user_id: profileID,
-          role: 'admin',
+          role: 'ADMIN',
         },
       } as FastifyRequest
 
       const result = await createUserRole(req)
 
       expect(result.success).toBe(true)
-      expect(result.data.role).toBe('admin')
+      expect(result.data.role).toBe('ADMIN')
       expect(result.data).toHaveProperty('role')
 
       createUserRoleId = result.data.id
@@ -94,7 +94,7 @@ describe('UserRoleController', () => {
       const result = await getUserRoleById(req)
 
       expect(result.success).toBe(true)
-      expect(result.data?.role).toBe('admin')
+      expect(result.data?.role).toBe('ADMIN')
     })
 
     it('deve retornar erro para ID inexistente', async () => {
@@ -125,14 +125,14 @@ describe('UserRoleController', () => {
           id: createUserRoleId,
         },
         body: {
-          role: 'Teste',
+          role: 'USER',
         },
       } as FastifyRequest
 
       const result = await updateUserRole(req)
 
       expect(result.success).toBe(true)
-      expect(result.data?.role).toBe('Teste')
+      expect(result.data?.role).toBe('USER')
     })
 
     it('deve retornar erro ao atualizar ID inexistente', async () => {
