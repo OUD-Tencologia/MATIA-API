@@ -23,12 +23,14 @@ export function authorize(...allowedRoles: string[]) {
       return
     }
 
-    // Extrai o role do JWT
-    const userPayload = request.user as { user_id: string; user_role: string }
-    const userRole = userPayload?.user_role
+    // Extrai o role do JWT (payload atual: { id, empresa_id, role })
+    const userPayload = request.user as { id: string; role: string }
+    const userRole = userPayload?.role
 
-    // Verifica se o usuário tem um dos roles permitidos
-    if (!userRole || !allowedRoles.includes(userRole)) {
+    // Verifica se o usuário tem um dos roles permitidos (case-insensitive,
+    // já que os roles reais são 'SUPER-ADMIN' | 'ADMIN' | 'USER')
+    const normalizedAllowed = allowedRoles.map(r => r.toUpperCase())
+    if (!userRole || !normalizedAllowed.includes(userRole.toUpperCase())) {
       throw new ForbiddenError(
         `Acesso negado. Roles necessários: ${allowedRoles.join(', ')}`
       )

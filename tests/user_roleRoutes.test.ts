@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import sequelize from '../src/db'
 import userRoleRoutes from '../src/routes/user_roleRoutes'
 import UserRole from '../src/models/user_roles'
-import { createProfile } from '../src/controllers/ProfileController'
+import { createProfile } from './helpers/createTestProfile.js'
 
 describe('UserRoleRoutes', () => {
   let app: FastifyInstance

@@ -5,7 +5,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import sequelize from '../src/db'
 import documentsTagsRelationsRoutes from '../src/routes/documents_tags_relationsRoutes'
 import DocumentsTagsRelation from '../src/models/documents_tags_relation'
-import { createProfile } from '../src/controllers/ProfileController'
+import { createProfile } from './helpers/createTestProfile.js'
 import { createDocuments } from '../src/controllers/documentsController'
 import { createDocumentsTags } from '../src/controllers/documents_tagsController'
 

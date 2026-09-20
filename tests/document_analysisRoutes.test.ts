@@ -5,7 +5,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import sequelize from '../src/db'
 import documentsAnalysisRoutes from '../src/routes/documents_analysisRoutes'
 import DocumentsAnalysis from '../src/models/documents_analysis'
-import { createProfile } from '../src/controllers/ProfileController'
+import { createProfile } from './helpers/createTestProfile.js'
 import { createConversation } from '../src/controllers/conversationController'
 import { createDocuments } from '../src/controllers/documentsController'
 

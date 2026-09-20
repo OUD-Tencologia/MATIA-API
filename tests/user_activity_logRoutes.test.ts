@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import sequelize from '../src/db.js'
 import userActivityLogsRoutes from '../src/routes/user_activity_logRoutes.js'
 import UserActivityLog from '../src/models/user_activity_log.js'
-import { createProfile } from '../src/controllers/ProfileController.js'
+import { createProfile } from './helpers/createTestProfile.js'
 
 describe('UserActivityLogRoutes', async () => {
   let app: FastifyInstance

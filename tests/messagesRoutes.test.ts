@@ -6,7 +6,7 @@ import sequelize from '../src/db'
 import messagesRoutes from '../src/routes/messagesRoutes'
 import Profile from '../src/models/profile'
 import Messages from '../src/models/messages'
-import { createProfile } from '../src/controllers/ProfileController'
+import { createProfile } from './helpers/createTestProfile.js'
 import { createConversation } from '../src/controllers/conversationController'
 
 describe('MessagesRoutes', () => {

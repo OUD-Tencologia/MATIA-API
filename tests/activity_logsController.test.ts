@@ -7,7 +7,7 @@ import {
 } from '../src/controllers/activity_logsController.js'
 import sequelize from '../src/db.js'
 import type { FastifyRequest } from 'fastify'
-import { createProfile } from '../src/controllers/ProfileController.js'
+import { createProfile } from './helpers/createTestProfile.js'
 
 describe('ActivityLogs', () => {
   let createActivityLogsID: string

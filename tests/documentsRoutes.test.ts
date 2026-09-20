@@ -5,7 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import sequelize from '../src/db'
 import documentsRoutes from '../src/routes/documentsRoutes'
 import Documents from '../src/models/documents'
-import { createProfile } from '../src/controllers/ProfileController'
+import { createProfile } from './helpers/createTestProfile.js'
 
 describe('DocumentsRoutes', () => {
   let app: FastifyInstance

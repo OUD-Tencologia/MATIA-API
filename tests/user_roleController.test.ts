@@ -7,7 +7,7 @@ import {
 } from '../src/controllers/user_roleController.js'
 import type { FastifyRequest } from 'fastify'
 import sequelize from '../src/db.js'
-import { createProfile } from '../src/controllers/ProfileController.js'
+import { createProfile } from './helpers/createTestProfile.js'
 
 describe('UserRoleController', () => {
   let createUserRoleId: string
