@@ -37,7 +37,7 @@ describe('DocumentsRoutes', () => {
 
     await app.ready()
 
-    testToken = app.jwt.sign({ user_id: 'test-user-id', user_role: 'admin' })
+    testToken = app.jwt.sign({ id: 'test-user-id', role: 'ADMIN', empresa_id: null })
 
     const profileReq = {
       body: {
