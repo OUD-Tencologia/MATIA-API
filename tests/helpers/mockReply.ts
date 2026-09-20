@@ -23,6 +23,12 @@ export function createMockReply() {
       result.body = payload
       return result
     },
+    setCookie() {
+      return reply
+    },
+    clearCookie() {
+      return reply
+    },
   }
 
   return { reply: reply as unknown as FastifyReply, result }
