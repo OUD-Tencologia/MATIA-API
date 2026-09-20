@@ -1,32 +1,32 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createRequire } from 'module';
-import {FastifyRequest} from "fastify";
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import type { FastifyRequest } from 'fastify'
+import sequelize from './helpers/registerAllModels.js'
+import { ProfileController } from '../src/controllers/ProfileController.js'
+import { createProfile } from './helpers/createTestProfile.js'
+import { createMockReply } from './helpers/mockReply.js'
 
-const require = createRequire(import.meta.url);
+// ProfileController.ts virou uma classe estática multi-tenant: cada método
+// recebe (request, reply) e lê `role`/`empresa_id` de `request.user` (o
+// payload do JWT). Aqui testamos os métodos diretamente, sem subir um
+// servidor Fastify (isso já é coberto, via HTTP, por profileRoutes.test.ts).
+describe('ProfileController', () => {
+  let adminUser: { id: string; role: 'SUPER-ADMIN'; empresa_id: null }
+  let createdUserId: string
 
-// Imports corrigidos (sem .js se forem arquivos .ts)
-
-
-describe('profileController', () => {
-  let createdUserId: string;
-
-  // Configuração antes de todos os testes
   beforeAll(async () => {
-    // CUIDADO: sync({force: true}) apaga os dados do banco do Docker!
-    await sequelize.sync({ force: true });
-  });
+    await sequelize.sync({ force: true })
+    adminUser = { id: 'admin-id', role: 'SUPER-ADMIN', empresa_id: null }
+  })
 
-  // Limpa após todos os testes
   afterAll(async () => {
-    await sequelize.close();
-  });
+    await sequelize.close()
+  })
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // CREATE - Testes de Criação
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  describe('createProfile', () => {
+  describe('criar', () => {
     it('deve criar um perfil com dados válidos', async () => {
-      const req = {
+      const { reply, result } = createMockReply()
+      const request = {
+        user: adminUser,
         body: {
           nome: 'João Silva',
           email: 'joao@email.com',
@@ -35,36 +35,22 @@ describe('profileController', () => {
           data_nascimento: '1990-01-01',
           profile_password: 'senha123',
         },
-        // Mock básico de logger caso o controller use req.log
-        log: { info: () => {}, error: () => {} }
-      } as unknown as FastifyRequest;
+      } as unknown as FastifyRequest
 
-      const result = (await createProfile(req)) as any;
+      await ProfileController.criar(request, reply)
 
-      expect(result.success).toBe(true);
-      expect(result.data.nome).toBe('João Silva');
-      expect(result.data).not.toHaveProperty('profile_password');
+      expect(result.statusCode).toBe(201)
+      expect(result.body.success).toBe(true)
+      expect(result.body.data.nome).toBe('João Silva')
+      expect(result.body.data).not.toHaveProperty('profile_password')
 
-      createdUserId = result.data.id;
-    });
-
-    it('deve rejeitar CPF inválido', async () => {
-      const req = {
-        body: {
-          nome: 'Teste',
-          email: 'teste@email.com',
-          cpf: '00000000000',
-          telefone: '19999999999',
-          data_nascimento: '1990-01-01',
-          profile_password: 'senha123',
-        },
-      } as unknown as FastifyRequest;
-
-      await expect(createProfile(req)).rejects.toThrow();
-    });
+      createdUserId = result.body.data.id
+    })
 
     it('deve rejeitar email duplicado', async () => {
-      const req = {
+      const { reply } = createMockReply()
+      const request = {
+        user: adminUser,
         body: {
           nome: 'Outro João',
           email: 'joao@email.com',
@@ -73,57 +59,111 @@ describe('profileController', () => {
           data_nascimento: '1995-05-15',
           profile_password: 'senha456',
         },
-      } as unknown as FastifyRequest;
+      } as unknown as FastifyRequest
 
-      await expect(createProfile(req)).rejects.toThrow();
-    });
-  });
+      await expect(ProfileController.criar(request, reply)).rejects.toThrow()
+    })
+  })
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // READ - Testes de Leitura
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  describe('getProfileById', () => {
+  describe('buscar', () => {
     it('deve retornar um perfil existente pelo ID', async () => {
-      const req = {
+      const { reply, result } = createMockReply()
+      const request = {
         params: { id: createdUserId },
-      } as unknown as FastifyRequest;
+        user: adminUser,
+      } as unknown as FastifyRequest
 
-      const result = await getProfileById(req);
+      await ProfileController.buscar(request, reply)
 
-      expect(result.success).toBe(true);
-      expect(result.data.id).toBe(createdUserId);
-      expect(result.data).not.toHaveProperty('profile_password');
-    });
-  });
+      expect(result.body.success).toBe(true)
+      expect(result.body.data.id).toBe(createdUserId)
+      expect(result.body.data).not.toHaveProperty('profile_password')
+    })
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // UPDATE - Testes de Atualização
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  describe('updateProfile', () => {
+    it('deve rejeitar ID inexistente', async () => {
+      const { reply } = createMockReply()
+      const request = {
+        params: { id: '00000000-0000-0000-0000-000000000000' },
+        user: adminUser,
+      } as unknown as FastifyRequest
+
+      await expect(ProfileController.buscar(request, reply)).rejects.toThrow()
+    })
+  })
+
+  describe('atualizar', () => {
     it('deve atualizar o nome do perfil', async () => {
-      const req = {
+      const { reply, result } = createMockReply()
+      const request = {
         params: { id: createdUserId },
+        user: adminUser,
         body: { nome: 'João Silva Atualizado' },
-      } as unknown as FastifyRequest;
+      } as unknown as FastifyRequest
 
-      const result = await updateProfile(req);
+      await ProfileController.atualizar(request, reply)
 
-      expect(result.success).toBe(true);
-      expect(result.data.nome).toBe('João Silva Atualizado');
-    });
-  });
+      expect(result.body.success).toBe(true)
+      expect(result.body.data.nome).toBe('João Silva Atualizado')
+    })
+  })
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // DELETE - Testes de Deleção
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  describe('deleteProfile', () => {
+  describe('excluir', () => {
     it('deve deletar um perfil existente', async () => {
-      const req = {
+      const { reply, result } = createMockReply()
+      const request = {
         params: { id: createdUserId },
-      } as unknown as FastifyRequest;
+        user: adminUser,
+      } as unknown as FastifyRequest
 
-      const result = await deleteProfile(req);
-      expect(result.success).toBe(true);
-    });
-  });
-});
+      await ProfileController.excluir(request, reply)
+
+      expect(result.statusCode).toBe(204)
+    })
+
+    it('deve rejeitar ao deletar um ID já deletado', async () => {
+      const { reply } = createMockReply()
+      const request = {
+        params: { id: createdUserId },
+        user: adminUser,
+      } as unknown as FastifyRequest
+
+      await expect(ProfileController.excluir(request, reply)).rejects.toThrow()
+    })
+  })
+
+  describe('getSelf', () => {
+    it('deve retornar o próprio perfil do usuário logado', async () => {
+      const { data: created } = await createProfile({
+        body: {
+          nome: 'Usuário Self',
+          email: 'self@email.com',
+          cpf: '70963685074',
+          telefone: '19977776666',
+          data_nascimento: '1992-02-02',
+          profile_password: 'senha123',
+        },
+      })
+
+      const { reply, result } = createMockReply()
+      const request = { user: { id: created.id } } as unknown as FastifyRequest
+
+      await ProfileController.getSelf(request, reply)
+
+      expect(result.statusCode).toBe(200)
+      expect(result.body.id).toBe(created.id)
+    })
+  })
+
+  describe('listar', () => {
+    it('lista os perfis visíveis para um SUPER-ADMIN', async () => {
+      const { reply, result } = createMockReply()
+      const request = { user: adminUser } as unknown as FastifyRequest
+
+      await ProfileController.listar(request, reply)
+
+      expect(result.body.success).toBe(true)
+      expect(Array.isArray(result.body.data)).toBe(true)
+      expect(result.body.data.length).toBeGreaterThan(0)
+    })
+  })
+})
