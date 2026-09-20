@@ -5,9 +5,9 @@ import {
   updateDocuments,
   deleteDocuments,
 } from '../src/controllers/documentsController.js'
-import sequelize from '../src/db.js'
+import sequelize from './helpers/registerAllModels.js'
 import type { FastifyRequest } from 'fastify'
-import { createProfile } from '../src/controllers/ProfileController.js'
+import { createProfile } from './helpers/createTestProfile.js'
 
 describe('DocumentsController', () => {
   let createDocumentosID: string

@@ -1,26 +1,25 @@
-import { it, describe, expect, afterAll, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import Fastify from 'fastify'
-import fastifyJwt, { FastifyJWT } from '@fastify/jwt'
+import fastifyJwt from '@fastify/jwt'
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import sequelize from '../src/db'
-import documentsAnalysisRoutes from '../src/routes/documents_analysisRoutes'
-import DocumentsAnalysis from '../src/models/documents_analysis'
-import { createProfile } from '../src/controllers/ProfileController'
+import sequelize from './helpers/registerAllModels.js'
+import messagesRoutes from '../src/routes/messagesRoutes'
+import Profile from '../src/models/profile'
+import Messages from '../src/models/messages'
+import { createProfile } from './helpers/createTestProfile.js'
 import { createConversation } from '../src/controllers/conversationController'
-import { createDocuments } from '../src/controllers/documentsController'
 
-describe('DocumentAnalysisRoutes', () => {
+describe('MessagesRoutes', () => {
   let app: FastifyInstance
   let testToken: string
-  let docID: string
   let profileID: string
-  let conversationID: string
-  let analysisID: string
+  let conversationsID: string
+  let messagesID: string
 
   beforeAll(async () => {
     await sequelize.sync({ force: true })
 
-    app = Fastify()
+    app = await Fastify()
 
     await app.register(fastifyJwt, {
       secret: 'test-secret-key',
@@ -37,9 +36,7 @@ describe('DocumentAnalysisRoutes', () => {
       }
     )
 
-    await app.register(documentsAnalysisRoutes, {
-      prefix: '/documents-analysis',
-    })
+    await app.register(messagesRoutes, { prefix: '/messages' })
 
     await app.ready()
 
@@ -60,34 +57,18 @@ describe('DocumentAnalysisRoutes', () => {
 
     profileID = profileBody.data.id
 
-    const docReq = {
-      body: {
-        user_id: profileID,
-        original_name: 'Nome original',
-        storage_path: 'Caminho de armazenamento',
-        file_type: 'Tipo de arquivo',
-        file_size: 25,
-        status: 'enviando',
-        progress: 20,
-      },
-    } as FastifyRequest
-
-    const docBody = await createDocuments(docReq)
-
-    docID = docBody.data.id
-
     const conversationReq = {
       body: {
         user_id: profileID,
         title: 'titulo-teste',
         is_favorite: true,
-        last_message_at: '20-10-2004',
+        last_message_at: '2004-10-20',
       },
     } as FastifyRequest
 
-    const conversationBody = await createConversation(conversationReq)
+    const conversationsBody = await createConversation(conversationReq)
 
-    conversationID = conversationBody.data.id
+    conversationsID = conversationsBody.data.id
   })
 
   afterAll(async () => {
@@ -95,43 +76,38 @@ describe('DocumentAnalysisRoutes', () => {
     app.close()
   })
 
-  describe('POST /documents-analysis', () => {
-    it('Deve criar um userRole com sucesso', async () => {
-      const documentAnalysis = {
-        conversation_id: conversationID,
-        document_id: docID,
-        analysis_type: 'sumario',
-        confidence_score: 7,
+  describe('POST /messages', () => {
+    it('deve criar uma mensagem com sucesso', async () => {
+      const messages = {
+        conversations_id: conversationsID,
+        content: 'Conteudo',
+        role: 'user',
       }
 
       const response = await app.inject({
         method: 'POST',
-        url: '/documents-analysis',
+        url: '/messages',
         headers: {
           authorization: `Bearer ${testToken}`,
         },
-        payload: documentAnalysis,
+        payload: messages,
       })
 
       const body = JSON.parse(response.body)
 
-      console.log(response.payload)
-      console.log(response.body)
+      messagesID = body.data.id
 
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
-      expect(body.data.conversation_id).toBe(conversationID)
+      expect(body.data.conversations_id).toBe(conversationsID)
       expect(body.data.id).toBeDefined()
-
-      analysisID = body.data.id
     })
   })
-
-  describe('GET /documents-analysis', () => {
-    it('Deve encontrar o userRole com sucesso', async () => {
+  describe('GET /messages', () => {
+    it('Deve encontrar o messages com sucesso', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: `/documents-analysis/${analysisID}`,
+        url: `/messages/${messagesID}`,
         headers: {
           authorization: `Bearer ${testToken}`,
         },
@@ -141,31 +117,31 @@ describe('DocumentAnalysisRoutes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
-      expect(body.data.conversation_id).toBe(conversationID)
-      expect(body.data.document_id).toBe(docID)
+      expect(body.data.conversations_id).toBe(conversationsID)
     })
 
     it('Deve retornar erro 401 ao tentar acessar sem o token', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: `/documents-analysis/${analysisID}`,
+        url: `/messages/${messagesID}`,
       })
 
       expect(response.statusCode).toBe(401)
     })
   })
-  describe('PUT /documents-analysis', () => {
-    it('Deve atualizar o DocumentAnalysis com sucesso', async () => {
-      const novaAcao = 'analise_legal'
+
+  describe('PUT /messages', async () => {
+    it('Deve atualizar o messages com sucesso', async () => {
+      const novaAcao = 'Conteudo2'
 
       const response = await app.inject({
         method: 'PUT',
-        url: `/documents-analysis/${analysisID}`,
+        url: `/messages/${messagesID}`,
         headers: {
           authorization: `Bearer ${testToken}`,
         },
         payload: {
-          analysis_type: novaAcao,
+          content: novaAcao,
         },
       })
 
@@ -173,17 +149,17 @@ describe('DocumentAnalysisRoutes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
-      expect(body.data.analysis_type).toBe(novaAcao)
+      expect(body.data.content).toBe(novaAcao)
     })
 
-    it('Deve retornar erro 401 ao tentar atualizar sem o token', async () => {
-      const novaAcao2 = 'analise_legal'
+    it('Deve retornar erro 401 ao tentar acessar sem o token', async () => {
+      const novaAcao2 = 'teste2'
 
       const response = await app.inject({
-        method: 'PUT',
-        url: `/documents-analysis/${analysisID}`,
+        method: 'GET',
+        url: `/messages/${messagesID}`,
         payload: {
-          analysis_type: novaAcao2,
+          content: novaAcao2,
         },
       })
 
@@ -191,11 +167,11 @@ describe('DocumentAnalysisRoutes', () => {
     })
   })
 
-  describe('DELETE /documents-analysis', () => {
-    it('Deve deletar um UserRole com sucesso', async () => {
+  describe('DELETE /messages', () => {
+    it('Deve deletar o messages com sucesso', async () => {
       const response = await app.inject({
         method: 'DELETE',
-        url: `/documents-analysis/${analysisID}`,
+        url: `/messages/${messagesID}`,
         headers: {
           authorization: `Bearer ${testToken}`,
         },
@@ -206,14 +182,14 @@ describe('DocumentAnalysisRoutes', () => {
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
 
-      const deletedUserRole = await DocumentsAnalysis.findByPk(analysisID)
-      expect(deletedUserRole).toBeNull()
+      const deletedMessages = await Messages.findByPk(messagesID)
+      expect(deletedMessages).toBeNull()
     })
 
     it('Deve retornar erro 401 ao tentar deletar sem o token', async () => {
       const response = await app.inject({
         method: 'DELETE',
-        url: `/documents-analysis/${analysisID}`,
+        url: `/messages/${messagesID}`,
       })
 
       expect(response.statusCode).toBe(401)

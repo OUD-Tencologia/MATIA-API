@@ -4,9 +4,9 @@ import {
   getDocumentsTagsRelationById,
   deleteDocumentsTagsRelation,
 } from '../src/controllers/documents_tags_relationController.js'
-import sequelize from '../src/db.js'
+import sequelize from './helpers/registerAllModels.js'
 import type { FastifyRequest } from 'fastify'
-import { createProfile } from '../src/controllers/ProfileController.js'
+import { createProfile } from './helpers/createTestProfile.js'
 import { createDocuments } from '../src/controllers/documentsController.js'
 import { createDocumentsTags } from '../src/controllers/documents_tagsController.js'
 

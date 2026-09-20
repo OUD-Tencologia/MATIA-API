@@ -1,17 +1,21 @@
 import { it, describe, expect, afterAll, beforeAll } from 'vitest'
 import Fastify from 'fastify'
-import fastifyJwt from '@fastify/jwt'
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import sequelize from '../src/db'
-import documentsRoutes from '../src/routes/documentsRoutes'
-import Documents from '../src/models/documents'
-import { createProfile } from '../src/controllers/ProfileController'
+import fastifyJwt, { FastifyJWT } from '@fastify/jwt'
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import sequelize from './helpers/registerAllModels.js'
+import documentsTagsRelationsRoutes from '../src/routes/documents_tags_relationsRoutes'
+import DocumentsTagsRelation from '../src/models/documents_tags_relation'
+import { createProfile } from './helpers/createTestProfile.js'
+import { createDocuments } from '../src/controllers/documentsController'
+import { createDocumentsTags } from '../src/controllers/documents_tagsController'
 
-describe('DocumentsRoutes', () => {
+describe('DocumentsTagsRelations', () => {
   let app: FastifyInstance
-  let testToken: string
+  let tagID: string
   let profileID: string
-  let documentsID: string
+  let docID: string
+  let relationID: string
+  let testToken: string
 
   beforeAll(async () => {
     await sequelize.sync({ force: true })
@@ -33,11 +37,13 @@ describe('DocumentsRoutes', () => {
       }
     )
 
-    await app.register(documentsRoutes, { prefix: '/documents' })
+    await app.register(documentsTagsRelationsRoutes, {
+      prefix: '/documents-tags-relation',
+    })
 
     await app.ready()
 
-    testToken = app.jwt.sign({ user_id: 'test-user-id', user_role: 'admin' })
+    testToken = app.jwt.sign({ id: 'some-id' })
 
     const profileReq = {
       body: {
@@ -53,16 +59,9 @@ describe('DocumentsRoutes', () => {
     const profileBody = await createProfile(profileReq)
 
     profileID = profileBody.data.id
-  })
 
-  afterAll(async () => {
-    sequelize.close()
-    app.close()
-  })
-
-  describe('POST /documents', () => {
-    it('Deve criar um documents com sucesso', async () => {
-      const documents = {
+    const docReq = {
+      body: {
         user_id: profileID,
         original_name: 'Nome original',
         storage_path: 'Caminho de armazenamento',
@@ -70,32 +69,64 @@ describe('DocumentsRoutes', () => {
         file_size: 25,
         status: 'enviando',
         progress: 20,
+      },
+    } as FastifyRequest
+
+    const docBody = await createDocuments(docReq)
+
+    docID = docBody.data.id
+
+    const docTagReq = {
+      body: {
+        name: 'nome-de-tag',
+        color: 'vermelho',
+      },
+    } as FastifyRequest
+
+    const docTagBody = await createDocumentsTags(docTagReq)
+
+    tagID = docTagBody.data.id
+  })
+
+  afterAll(async () => {
+    await app.close()
+    await sequelize.close()
+  })
+
+  describe('POST /documents-tag-relations', () => {
+    it('Deve criar um documentsTagsRelation com sucesso', async () => {
+      const documentsTagsRelation = {
+        tag_id: tagID,
+        document_id: docID,
       }
 
       const response = await app.inject({
         method: 'POST',
-        url: '/documents',
+        url: '/documents-tags-relation',
         headers: {
           authorization: `Bearer ${testToken}`,
         },
-        payload: documents,
+        payload: documentsTagsRelation,
       })
 
       const body = JSON.parse(response.body)
 
+      console.log(response)
+
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
-      expect(body.data.user_id).toBe(profileID)
+      expect(body.data.tag_id).toBe(tagID)
       expect(body.data.id).toBeDefined()
 
-      documentsID = body.data.id
+      relationID = body.data.id
     })
   })
-  describe('GET /documents', () => {
-    it('Deve encontrar um documento com sucesso', async () => {
+
+  describe('GET /documents-tag-relations', () => {
+    it('Deve encontrar o documentsTagsRelation com sucesso', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: `/documents/${documentsID}`,
+        url: `/documents-tags-relation/${relationID}`,
         headers: {
           authorization: `Bearer ${testToken}`,
         },
@@ -105,61 +136,24 @@ describe('DocumentsRoutes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
-      expect(body.data.id).toBe(documentsID)
+      expect(body.data.tag_id).toBe(tagID)
     })
 
     it('Deve retornar erro 401 ao tentar acessar sem o token', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: `/documents/${documentsID}`,
+        url: `/documents-tags-relation/${relationID}`,
       })
 
       expect(response.statusCode).toBe(401)
     })
   })
 
-  describe('PUT /documents', () => {
-    it('Deve atualizar o documents com sucesso', async () => {
-      const novaAcao = 28
-
-      const response = await app.inject({
-        method: 'PUT',
-        url: `/documents/${documentsID}`,
-        headers: {
-          authorization: `Bearer ${testToken}`,
-        },
-        payload: {
-          file_size: novaAcao,
-        },
-      })
-
-      const body = JSON.parse(response.body)
-
-      expect(response.statusCode).toBe(200)
-      expect(body.success).toBe(true)
-      expect(body.data.file_size).toBe(novaAcao)
-    })
-
-    it('Deve retornar erro 401 ao tentar atualizar sem o token', async () => {
-      const novaAcao2 = 34
-
-      const response = await app.inject({
-        method: 'PUT',
-        url: `/documents/${documentsID}`,
-        payload: {
-          file_size: novaAcao2,
-        },
-      })
-
-      expect(response.statusCode).toBe(401)
-    })
-  })
-
-  describe('DELETE /documents', () => {
-    it('Deve deletar o documents com sucesso', async () => {
+  describe('DELETE /documents-tag-relations', () => {
+    it('Deve deletar um documentsTagsRelation com sucesso', async () => {
       const response = await app.inject({
         method: 'DELETE',
-        url: `/documents/${documentsID}`,
+        url: `/documents-tags-relation/${relationID}`,
         headers: {
           authorization: `Bearer ${testToken}`,
         },
@@ -170,14 +164,15 @@ describe('DocumentsRoutes', () => {
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
 
-      const deletedDouments = await Documents.findByPk(documentsID)
-      expect(deletedDouments).toBeNull()
+      const deleteddocumentsTagsRelation =
+        await DocumentsTagsRelation.findByPk(relationID)
+      expect(deleteddocumentsTagsRelation).toBeNull()
     })
 
     it('Deve retornar erro 401 ao tentar deletar sem o token', async () => {
       const response = await app.inject({
         method: 'DELETE',
-        url: `/documents/${documentsID}`,
+        url: `/documents-tags-relation/${relationID}`,
       })
 
       expect(response.statusCode).toBe(401)

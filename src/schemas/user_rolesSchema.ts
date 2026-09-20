@@ -6,7 +6,7 @@ export const createUserRoleSchema: FastifySchema = {
     required: ['user_id', 'role'],
     properties: {
       user_id: { type: 'string', format: 'uuid' },
-      role: { type: 'string', enum: ['admin', 'publico'] },
+      role: { type: 'string', enum: ['SUPER-ADMIN', 'ADMIN', 'USER'] },
     } as const,
     additionalProperties: false,
   },
@@ -18,7 +18,7 @@ export const updateUserRoleSchema: FastifySchema = {
     required: [],
     properties: {
       user_id: { type: 'string', format: 'uuid' },
-      role: { type: 'string', enum: ['admin', 'publico'] },
+      role: { type: 'string', enum: ['SUPER-ADMIN', 'ADMIN', 'USER'] },
     } as const,
     additionalProperties: false,
   },

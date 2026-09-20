@@ -19,7 +19,7 @@ import Conversation from '../src/models/conversation.js'
 import Messages from '../src/models/messages.js'
 import Profile from '../src/models/profile.js' // ✅ IMPORTANTE: Importar Profile para que seja sincronizado
 import type { FastifyRequest } from 'fastify'
-import { createProfile } from '../src/controllers/ProfileController.js'
+import { createProfile } from './helpers/createTestProfile.js'
 
 // Interface para tipagem das mensagens
 interface MessageResponse {

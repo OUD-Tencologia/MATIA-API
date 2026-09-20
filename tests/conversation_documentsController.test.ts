@@ -7,9 +7,9 @@ import {
 } from '../src/controllers/conversation_documentsController.js'
 
 import { createConversation } from '../src/controllers/conversationController.js'
-import sequelize from '../src/db.js'
+import sequelize from './helpers/registerAllModels.js'
 import type { FastifyRequest } from 'fastify'
-import { createProfile } from '../src/controllers/ProfileController.js'
+import { createProfile } from './helpers/createTestProfile.js'
 import { createDocuments } from '../src/controllers/documentsController.js'
 
 describe('ConversationDocumentsController', () => {

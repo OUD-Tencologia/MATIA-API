@@ -2,20 +2,20 @@ import { it, describe, expect, afterAll, beforeAll } from 'vitest'
 import Fastify from 'fastify'
 import fastifyJwt, { FastifyJWT } from '@fastify/jwt'
 import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
-import sequelize from '../src/db'
-import conversationDocumentsRoutes from '../src/routes/conversation_documentsRoutes'
-import { createProfile } from '../src/controllers/ProfileController'
+import sequelize from './helpers/registerAllModels.js'
+import activityLogsRoutes from '../src/routes/activity_logsRoutes'
+import { createProfile } from './helpers/createTestProfile.js'
 import { createConversation } from '../src/controllers/conversationController'
 import { createDocuments } from '../src/controllers/documentsController'
 import ConversationDocuments from '../src/models/conversation_documents'
+import ActivityLog from '../src/models/activity_logs'
 
 describe('DocumentAnalysisRoutes', () => {
   let app: FastifyInstance
-  let conversationID: string
-  let docID: string
+  let profileID2: string
   let testToken: string
-  let profileID: string
-  let conversationDocumentsID: string
+  let profileID1: string
+  let activityLogID: string
 
   beforeAll(async () => {
     await sequelize.sync({ force: true })
@@ -37,77 +37,65 @@ describe('DocumentAnalysisRoutes', () => {
       }
     )
 
-    await app.register(conversationDocumentsRoutes, {
-      prefix: '/conversation-documents',
+    await app.register(activityLogsRoutes, {
+      prefix: '/activity-logs',
     })
 
     await app.ready()
 
     testToken = app.jwt.sign({ id: 'some-id' })
 
-    const profileReq = {
+    const profileReq1 = {
       body: {
-        nome: 'João Silva',
-        email: 'joao@email.com',
-        cpf: '52998224725', // CPF válido
-        telefone: '19999999999',
-        data_nascimento: '1990-01-01',
-        profile_password: 'senha123',
+        nome: 'Usuário-de-Teste Rotas',
+        email: 'test.routes@email.com',
+        cpf: '52998224725',
+        telefone: '11988887777',
+        data_nascimento: '1995-05-15',
+        profile_password: 'password123',
       },
     } as FastifyRequest
 
-    const profileBody = await createProfile(profileReq)
+    const profileBody1 = await createProfile(profileReq1)
 
-    profileID = profileBody.data.id
+    profileID1 = profileBody1.data.id
 
-    const docReq = {
+    const profileReq2 = {
       body: {
-        user_id: profileID,
-        original_name: 'Nome original',
-        storage_path: 'Caminho de armazenamento',
-        file_type: 'Tipo de arquivo',
-        file_size: 25,
-        status: 'enviando',
-        progress: 20,
+        nome: 'Usuário-de-Teste Rtas',
+        email: 'test.routss@email.com',
+        cpf: '70963685074',
+        telefone: '11988887677',
+        data_nascimento: '1995-04-15',
+        profile_password: 'password1234',
       },
     } as FastifyRequest
 
-    const docBody = await createDocuments(docReq)
+    const profileBody2 = await createProfile(profileReq2)
 
-    docID = docBody.data.id
-
-    const conversationReq = {
-      body: {
-        user_id: profileID,
-        title: 'titulo-teste',
-        is_favorite: true,
-        last_message_at: '20-10-2004',
-      },
-    } as FastifyRequest
-
-    const conversationBody = await createConversation(conversationReq)
-
-    conversationID = conversationBody.data.id
+    profileID2 = profileBody2.data.id
   })
 
   afterAll(async () => {
     sequelize.close()
     app.close()
   })
-  describe('POST /conversation-documents', () => {
-    it('deve criar um conversation com sucesso', async () => {
-      const conversationDocuments = {
-        conversation_id: conversationID,
-        document_id: docID,
+  describe('POST /activity-logs', () => {
+    it('deve criar um activityLogs com sucesso', async () => {
+      const activityLogs = {
+        user_id: profileID1,
+        action: 'login',
+        entity_id: profileID2,
+        entity_type: 'document',
       }
 
       const response = await app.inject({
         method: 'POST',
-        url: '/conversation-documents',
+        url: '/activity-logs',
         headers: {
           authorization: `Bearer ${testToken}`,
         },
-        payload: conversationDocuments,
+        payload: activityLogs,
       })
 
       const body = JSON.parse(response.body)
@@ -116,18 +104,18 @@ describe('DocumentAnalysisRoutes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
-      expect(body.data.conversation_id).toBe(conversationID)
+      expect(body.data.user_id).toBe(profileID1)
       expect(body.data.id).toBeDefined()
 
-      conversationDocumentsID = body.data.id
+      activityLogID = body.data.id
     })
   })
 
-  describe('GET /conversation-documents', () => {
-    it('Deve encontrar o conversationDocuments com sucesso', async () => {
+  describe('GET /activity-logs', () => {
+    it('Deve encontrar o ActivtyLogs com sucesso', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: `/conversation-documents/${conversationDocumentsID}`,
+        url: `/activity-logs/${activityLogID}`,
         headers: {
           authorization: `Bearer ${testToken}`,
         },
@@ -137,24 +125,24 @@ describe('DocumentAnalysisRoutes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
-      expect(body.data.id).toBe(conversationDocumentsID)
+      expect(body.data.id).toBe(activityLogID)
     })
 
     it('Deve retornar erro 401 ao acessar sem token', async () => {
       const response = await app.inject({
         method: 'GET',
-        url: `/conversation-documents/${conversationDocumentsID}`,
+        url: `/activity-logs/${activityLogID}`,
       })
 
       expect(response.statusCode).toBe(401)
     })
   })
 
-  describe('DELETE /conversation-documents', () => {
-    it('Deve deletar o conversationDocuments com sucesso', async () => {
+  describe('DELETE /activity-logs', () => {
+    it('Deve deletar o activityLogs com sucesso', async () => {
       const response = await app.inject({
         method: 'DELETE',
-        url: `/conversation-documents/${conversationDocumentsID}`,
+        url: `/activity-logs/${activityLogID}`,
         headers: {
           authorization: `Bearer ${testToken}`,
         },
@@ -165,16 +153,14 @@ describe('DocumentAnalysisRoutes', () => {
       expect(response.statusCode).toBe(200)
       expect(body.success).toBe(true)
 
-      const deletedBody = await ConversationDocuments.findByPk(
-        conversationDocumentsID
-      )
+      const deletedBody = await ActivityLog.findByPk(activityLogID)
       expect(deletedBody).toBeNull()
     })
 
     it('Deve retornar erro 401 ao tentar acessar sem token', async () => {
       const response = await app.inject({
         method: 'DELETE',
-        url: `/conversation-documents/${conversationDocumentsID}`,
+        url: `/activity-logs/${activityLogID}`,
       })
 
       expect(response.statusCode).toBe(401)

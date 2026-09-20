@@ -5,9 +5,9 @@ import {
   updateConversation,
   deleteConversation,
 } from '../src/controllers/conversationController.js'
-import sequelize from '../src/db.js'
+import sequelize from './helpers/registerAllModels.js'
 import type { FastifyRequest } from 'fastify'
-import { createProfile } from '../src/controllers/ProfileController.js'
+import { createProfile } from './helpers/createTestProfile.js'
 
 describe('ConversationController', () => {
   let createConversationID: string
