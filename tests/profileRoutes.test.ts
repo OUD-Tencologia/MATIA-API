@@ -2,13 +2,16 @@ import { expect, it, beforeAll, describe, afterAll } from 'vitest'
 import Fastify from 'fastify'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import fastifyJwt from '@fastify/jwt'
-import sequelize from '../src/db.js'
+import sequelize from './helpers/registerAllModels.js'
 import profileRoutes from '../src/routes/profileRoutes.js'
 import Profile from '../src/models/profile.js'
 
+// Hoje /profile é multi-tenant: toda rota exige autenticação, e o Controller
+// lê `role`/`empresa_id` do token para decidir o que o usuário pode ver/criar
+// (ver src/controllers/ProfileController.ts + src/repositories/UserRepository.ts).
 describe('ProfileRoutes - Testes de Integração', () => {
   let app: FastifyInstance
-  let testToken: string
+  let adminToken: string
   let createdUserID: string
 
   const testUser = {
@@ -44,7 +47,9 @@ describe('ProfileRoutes - Testes de Integração', () => {
 
     await app.ready()
 
-    testToken = app.jwt.sign({ id: 'some-id' })
+    // SUPER-ADMIN com empresa_id null: ignora o filtro por empresa no
+    // UserRepository, então consegue criar/ler/atualizar/apagar livremente.
+    adminToken = app.jwt.sign({ id: 'admin-id', role: 'SUPER-ADMIN', empresa_id: null })
   })
 
   afterAll(async () => {
@@ -53,16 +58,29 @@ describe('ProfileRoutes - Testes de Integração', () => {
   })
 
   describe('POST /profile', () => {
-    it('deve criar um novo perfil com sucesso', async () => {
+    it('deve retornar 401 ao tentar criar sem token (rota exige autenticação)', async () => {
       const response = await app.inject({
         method: 'POST',
         url: '/profile',
         payload: testUser,
       })
 
+      expect(response.statusCode).toBe(401)
+    })
+
+    it('deve criar um novo perfil com sucesso', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/profile',
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: testUser,
+      })
+
       const body = JSON.parse(response.body)
 
-      expect(response.statusCode).toBe(200)
+      expect(response.statusCode).toBe(201)
       expect(body.success).toBe(true)
       expect(body.data.nome).toBe(testUser.nome)
       expect(body.data.id).toBeDefined()
@@ -70,14 +88,17 @@ describe('ProfileRoutes - Testes de Integração', () => {
       createdUserID = body.data.id
     })
 
-    it('deve retornar erro de validação (CPF inválido)', async () => {
+    it('deve rejeitar email duplicado', async () => {
       const response = await app.inject({
         method: 'POST',
         url: '/profile',
-        payload: { ...testUser, cpf: '000.000.000-00' },
+        headers: {
+          authorization: `Bearer ${adminToken}`,
+        },
+        payload: { ...testUser, cpf: '71428793860', telefone: '11977776666' },
       })
 
-      expect(response.statusCode).toBeGreaterThanOrEqual(400)
+      expect(response.statusCode).toBe(409)
     })
   })
 
@@ -87,7 +108,7 @@ describe('ProfileRoutes - Testes de Integração', () => {
         method: 'GET',
         url: `/profile/${createdUserID}`,
         headers: {
-          authorization: `Bearer ${testToken}`,
+          authorization: `Bearer ${adminToken}`,
         },
       })
 
@@ -116,7 +137,7 @@ describe('ProfileRoutes - Testes de Integração', () => {
         method: 'PUT',
         url: `/profile/${createdUserID}`,
         headers: {
-          authorization: `Bearer ${testToken}`,
+          authorization: `Bearer ${adminToken}`,
         },
         payload: {
           nome: novoNome,
@@ -130,13 +151,16 @@ describe('ProfileRoutes - Testes de Integração', () => {
       expect(body.data.nome).toBe(novoNome)
     })
 
-    it('deve retornar erro 401 ao tentar acessar sem token', async () => {
+    it('deve retornar 401 ao tentar atualizar sem token', async () => {
       const response = await app.inject({
         method: 'PUT',
         url: `/profile/${createdUserID}`,
+        payload: {
+          nome: 'Outro Nome',
+        },
       })
 
-      expect(response.statusCode).toBe(400)
+      expect(response.statusCode).toBe(401)
     })
   })
 
@@ -146,14 +170,11 @@ describe('ProfileRoutes - Testes de Integração', () => {
         method: 'DELETE',
         url: `/profile/${createdUserID}`,
         headers: {
-          authorization: `Bearer ${testToken}`,
+          authorization: `Bearer ${adminToken}`,
         },
       })
 
-      const body = JSON.parse(response.body)
-
-      expect(response.statusCode).toBe(200)
-      expect(body.success).toBe(true)
+      expect(response.statusCode).toBe(204)
 
       const userAfterDelete = await Profile.findByPk(createdUserID)
       expect(userAfterDelete).toBeNull()
