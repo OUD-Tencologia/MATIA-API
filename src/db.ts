@@ -1,7 +1,15 @@
 import { config } from 'dotenv'
 import path from 'path'
 import { Sequelize } from 'sequelize'
+import type { Options } from 'sequelize'
 import { fileURLToPath } from 'url'
+
+// `foreignKeys` is a real sqlite ConnectionManager option (see
+// node_modules/sequelize/lib/dialects/sqlite/connection-manager.js), but
+// sequelize's own type definitions don't declare it on `Options`.
+interface SqliteOptions extends Options {
+    foreignKeys?: boolean
+}
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -22,7 +30,7 @@ if (process.env.NODE_ENV === 'test') {
         // so `PRAGMA foreign_keys = OFF` was silently never applied. `foreignKeys: false`
         // is the dialect option the sqlite ConnectionManager actually reads.
         foreignKeys: false,
-    })
+    } satisfies SqliteOptions as SqliteOptions)
 } else {
     // Verifica se as variáveis de ambiente estão definidas
     if (!process.env.DB_NAME) throw new Error('DB_NAME não definido no .env')
